@@ -62,6 +62,11 @@ export async function fetchGameMaster() {
       const dexMatch = tid.match(/V(\d{4})_POKEMON_/);
       if (dexMatch) {
         const dexNr = parseInt(dexMatch[1], 10);
+        // Some newer Pokemon have numeric pokemonId — normalize to string from templateId
+        if (typeof ps.pokemonId !== "string") {
+          const baseName = tid.replace(/^V\d{4}_POKEMON_/, "").replace(/_NORMAL$/, "");
+          ps.pokemonId = baseName;
+        }
         // Extract form suffix from templateId (e.g., V0019_POKEMON_RATTATA_ALOLA → RATTATA_ALOLA)
         const formSuffix = tid.replace(/^V\d{4}_POKEMON_/, "");
         // Use formSuffix as key to preserve regional variants
@@ -147,8 +152,8 @@ export async function fetchGameMaster() {
 
     // Build evolution data
     const evolutions = (base.evolutionBranch || []).map((evo) => ({
-      id: evo.evolution || "",
-      formId: evo.form || `${evo.evolution}_NORMAL`,
+      id: String(evo.evolution || ""),
+      formId: String(evo.form || `${evo.evolution}_NORMAL`),
       candies: evo.candyCost || 0,
       item: evo.evolutionItemRequirement || null,
       quests: evo.questDisplay
@@ -173,8 +178,8 @@ export async function fetchGameMaster() {
         }
 
         acc[regionFormId] = {
-          id: regionFormId,
-          formId: regionFormId,
+          id: String(regionFormId),
+          formId: String(regionFormId),
           dexNr,
           generation: getGeneration(dexNr),
           names: { English: idToName(regionFormId) },
@@ -191,8 +196,8 @@ export async function fetchGameMaster() {
           eliteQuickMoves: [],
           eliteCinematicMoves: [],
           evolutions: (regionEntry.evolutionBranch || []).map((evo) => ({
-            id: evo.evolution || "",
-            formId: evo.form || `${evo.evolution}_NORMAL`,
+            id: String(evo.evolution || ""),
+            formId: String(evo.form || `${evo.evolution}_NORMAL`),
             candies: evo.candyCost || 0,
           })),
           hasMegaEvolution: false,
@@ -226,8 +231,8 @@ export async function fetchGameMaster() {
     }));
 
     pokemon.push({
-      id: base.pokemonId,
-      formId,
+      id: String(base.pokemonId),
+      formId: String(formId),
       dexNr,
       generation: getGeneration(dexNr),
       names: { English: idToName(base.pokemonId) },
