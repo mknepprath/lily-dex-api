@@ -1,0 +1,12 @@
+{
+  "name": "lily-dex-api",
+  "version": "1.0.0",
+  "description": "Pokemon GO data API for lily dex",
+  "type": "module",
+  "scripts": {
+    "build": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
