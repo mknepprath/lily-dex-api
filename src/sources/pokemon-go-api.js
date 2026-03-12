@@ -3,11 +3,12 @@ import { fetchWithCache } from "../utils.js";
 const BASE = "https://pokemon-go-api.github.io/pokemon-go-api/api";
 
 export async function fetchPokemonGoApi() {
-  const [pokedex, raids, maxBattles, quests] = await Promise.all([
+  const [pokedex, raids, maxBattles, quests, types] = await Promise.all([
     fetchWithCache("pokedex", `${BASE}/pokedex.json`),
     fetchWithCache("raids", `${BASE}/raidboss.json`),
     fetchWithCache("max-battles", `${BASE}/maxbattles.json`),
     fetchWithCache("quests", `${BASE}/quests.json`),
+    fetchWithCache("types", `${BASE}/types.json`),
   ]);
 
   // Build lookup maps from pokedex for supplementary data
@@ -41,6 +42,7 @@ export async function fetchPokemonGoApi() {
     raids: raids.data,
     maxBattles: maxBattles.data,
     quests: quests.data,
+    types: types.data,
     namesByDex,
     shinyByDex,
     assetsByDex,
@@ -50,6 +52,7 @@ export async function fetchPokemonGoApi() {
       raids: raids.status,
       maxBattles: maxBattles.status,
       quests: quests.status,
+      types: types.status,
     },
   };
 }

@@ -32,23 +32,29 @@ async function build() {
   // Write outputs
   console.log("\nWriting output files...");
 
-  writeFileSync(`${OUTPUT_DIR}pokemon.json`, JSON.stringify(pokemon));
-  console.log(`  pokemon.json (${pokemon.length} entries)`);
+  writeFileSync(`${OUTPUT_DIR}pokedex.json`, JSON.stringify(pokemon));
+  console.log(`  pokedex.json (${pokemon.length} entries)`);
 
-  writeFileSync(`${OUTPUT_DIR}raids.json`, JSON.stringify(pokemonGoApi.raids));
-  console.log(`  raids.json`);
+  writeFileSync(`${OUTPUT_DIR}raidboss.json`, JSON.stringify(pokemonGoApi.raids));
+  console.log(`  raidboss.json`);
 
   writeFileSync(
-    `${OUTPUT_DIR}max-battles.json`,
+    `${OUTPUT_DIR}maxbattles.json`,
     JSON.stringify(pokemonGoApi.maxBattles)
   );
-  console.log(`  max-battles.json`);
+  console.log(`  maxbattles.json`);
 
   writeFileSync(
     `${OUTPUT_DIR}quests.json`,
     JSON.stringify(pokemonGoApi.quests)
   );
   console.log(`  quests.json`);
+
+  writeFileSync(
+    `${OUTPUT_DIR}types.json`,
+    JSON.stringify(pokemonGoApi.types)
+  );
+  console.log(`  types.json`);
 
   // Meta file
   const meta = {
