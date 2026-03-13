@@ -43,6 +43,21 @@ export const TYPE_NAMES = {
   POKEMON_TYPE_FAIRY: "Fairy",
 };
 
+export const ITEM_NAMES = {
+  ITEM_SUN_STONE: "Sun Stone",
+  ITEM_KINGS_ROCK: "King's Rock",
+  ITEM_METAL_COAT: "Metal Coat",
+  ITEM_DRAGON_SCALE: "Dragon Scale",
+  ITEM_UP_GRADE: "Up-Grade",
+  ITEM_GEN4_EVOLUTION_STONE: "Sinnoh Stone",
+  ITEM_GEN5_EVOLUTION_STONE: "Unova Stone",
+  ITEM_OTHER_EVOLUTION_STONE_A: "999 Gimmighoul Coins",
+  ITEM_MAGNETIC_LURE: "Magnetic Lure Module",
+  ITEM_MOSSY_LURE: "Mossy Lure Module",
+  ITEM_GLACIAL_LURE: "Glacial Lure Module",
+  ITEM_RAINY_LURE: "Rainy Lure Module",
+};
+
 export function getGeneration(dexNr) {
   if (dexNr <= 151) return 1;
   if (dexNr <= 251) return 2;

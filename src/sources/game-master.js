@@ -1,4 +1,4 @@
-import { fetchWithCache, TYPE_NAMES, getGeneration, idToName, moveIdToName } from "../utils.js";
+import { fetchWithCache, TYPE_NAMES, ITEM_NAMES, getGeneration, idToName, moveIdToName } from "../utils.js";
 
 const URL =
   "https://raw.githubusercontent.com/PokeMiners/game_masters/master/latest/latest.json";
@@ -155,7 +155,9 @@ export async function fetchGameMaster() {
       id: String(evo.evolution || ""),
       formId: String(evo.form || `${evo.evolution}_NORMAL`),
       candies: evo.candyCost || 0,
-      item: evo.evolutionItemRequirement || null,
+      item: evo.evolutionItemRequirement
+        ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }
+        : null,
       quests: evo.questDisplay
         ? [{ id: evo.questDisplay.questRequirementTemplateId || "", type: null, names: { English: evo.questDisplay.questRequirementTemplateId || "" } }]
         : null,
