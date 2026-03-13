@@ -1,4 +1,4 @@
-import { fetchWithCache } from "../utils.js";
+import { fetchWithCache, moveIdToName } from "../utils.js";
 
 const BASE =
   "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data";
@@ -85,6 +85,7 @@ export async function fetchPvpRankings(speciesIdToDex) {
         null,
       rating: entry.rating,
       moveset: entry.moveset,
+      movesetNames: (entry.moveset || []).map(moveIdToName),
       matchups: (entry.matchups || []).slice(0, 5),
       counters: (entry.counters || []).slice(0, 5),
     }));

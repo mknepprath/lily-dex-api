@@ -160,6 +160,7 @@ export async function fetchGameMaster() {
     const evolutions = (base.evolutionBranch || []).map((evo) => ({
       id: String(evo.evolution || ""),
       formId: String(evo.form || `${evo.evolution}_NORMAL`),
+      dexNr: pokemonMap.get(evo.evolution)?.dexNr || pokemonMap.get(`${evo.evolution}_NORMAL`)?.dexNr || null,
       candies: evo.candyCost || 0,
       item: evo.evolutionItemRequirement
         ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }
@@ -216,6 +217,7 @@ export async function fetchGameMaster() {
           evolutions: (regionEntry.evolutionBranch || []).map((evo) => ({
             id: String(evo.evolution || ""),
             formId: String(evo.form || `${evo.evolution}_NORMAL`),
+            dexNr: pokemonMap.get(evo.evolution)?.dexNr || pokemonMap.get(`${evo.evolution}_NORMAL`)?.dexNr || null,
             candies: evo.candyCost || 0,
             item: evo.evolutionItemRequirement
               ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }

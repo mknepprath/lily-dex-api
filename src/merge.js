@@ -124,11 +124,13 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
     // Add PvPoke data
     const thirdMoveCost = pvpoke.thirdMoveCostByDex.get(dex) || null;
     const defaultIVs = pvpoke.defaultIVsByDex.get(dex) || null;
+    const tags = pvpoke.tagsByDex.get(dex) || [];
 
     output.push({
       ...cleanEntry,
       thirdMoveCost,
       defaultIVs,
+      tags,
       assets,
       pixelSprites: {
         image: `${pixelBase}/${spriteId}.png`,
