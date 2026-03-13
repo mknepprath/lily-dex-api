@@ -36,7 +36,7 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
         gm.secondaryType.names = apiEntry.secondaryType.names;
       }
 
-      // Supplement regional form names and data
+      // Supplement regional form names, types, and assets
       if (apiEntry.regionForms && typeof gm.regionForms === "object" && !Array.isArray(gm.regionForms)) {
         for (const [formId, form] of Object.entries(gm.regionForms)) {
           const apiForm = Object.values(apiEntry.regionForms || {}).find(
@@ -50,6 +50,22 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
           }
           if (apiForm?.secondaryType?.names && form.secondaryType) {
             form.secondaryType.names = apiForm.secondaryType.names;
+          }
+          // Match assets from apiForm or from base assetForms by form suffix
+          if (apiForm?.assets) {
+            form.assets = apiForm.assets;
+          } else if (apiEntry.assetForms?.length > 0) {
+            // Match by form suffix (e.g., MEOWTH_ALOLA → "ALOLA")
+            const suffix = formId.replace(/^[^_]+_/, "");
+            const matchingAsset = apiEntry.assetForms.find(
+              (af) => af.form === suffix
+            );
+            if (matchingAsset) {
+              form.assets = {
+                image: matchingAsset.image || null,
+                shinyImage: matchingAsset.shinyImage || null,
+              };
+            }
           }
         }
       }
