@@ -63,7 +63,7 @@ async function build() {
 
   writeFileSync(
     `${OUTPUT_DIR}rankings.json`,
-    JSON.stringify({ great: rankings.great, ultra: rankings.ultra })
+    JSON.stringify({ little: rankings.little, great: rankings.great, ultra: rankings.ultra, master: rankings.master })
   );
   console.log(`  rankings.json`);
 

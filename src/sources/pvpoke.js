@@ -61,9 +61,11 @@ export async function fetchPvpoke() {
 export async function fetchPvpRankings(speciesIdToDex) {
   const RANKINGS_BASE = `${BASE}/rankings/all/overall`;
 
-  const [great, ultra] = await Promise.all([
+  const [little, great, ultra, master] = await Promise.all([
+    fetchWithCache("rankings-500", `${RANKINGS_BASE}/rankings-500.json`),
     fetchWithCache("rankings-1500", `${RANKINGS_BASE}/rankings-1500.json`),
     fetchWithCache("rankings-2500", `${RANKINGS_BASE}/rankings-2500.json`),
+    fetchWithCache("rankings-10000", `${RANKINGS_BASE}/rankings-10000.json`),
   ]);
 
   const mapRankings = (data) =>
@@ -82,8 +84,10 @@ export async function fetchPvpRankings(speciesIdToDex) {
     }));
 
   return {
+    little: mapRankings(little.data),
     great: mapRankings(great.data),
     ultra: mapRankings(ultra.data),
-    status: { great: great.status, ultra: ultra.status },
+    master: mapRankings(master.data),
+    status: { little: little.status, great: great.status, ultra: ultra.status, master: master.status },
   };
 }
