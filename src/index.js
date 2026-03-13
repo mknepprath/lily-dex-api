@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { fetchGameMaster } from "./sources/game-master.js";
-import { fetchPvpoke } from "./sources/pvpoke.js";
+import { fetchPvpoke, fetchPvpRankings } from "./sources/pvpoke.js";
 import { fetchPokemonGoApi } from "./sources/pokemon-go-api.js";
 import { mergePokemon } from "./merge.js";
 
@@ -23,6 +23,11 @@ async function build() {
   sourceStatus.gameMaster = gameMaster.status;
   sourceStatus.pvpoke = pvpoke.status;
   sourceStatus.pokemonGoApi = pokemonGoApi.status;
+
+  // Fetch PvP rankings (needs speciesIdToDex from pvpoke)
+  console.log("\nFetching PvP rankings...");
+  const rankings = await fetchPvpRankings(pvpoke.speciesIdToDex);
+  sourceStatus.rankings = rankings.status;
 
   // Merge Pokemon data
   console.log("\nMerging Pokemon data...");
@@ -56,12 +61,18 @@ async function build() {
   );
   console.log(`  types.json`);
 
+  writeFileSync(
+    `${OUTPUT_DIR}rankings.json`,
+    JSON.stringify({ great: rankings.great, ultra: rankings.ultra })
+  );
+  console.log(`  rankings.json`);
+
   // Meta file
   const meta = {
     buildTime: new Date().toISOString(),
     sources: sourceStatus,
     pokemonCount: pokemon.length,
-    version: "1.0.0",
+    version: "1.1.0",
   };
   writeFileSync(`${OUTPUT_DIR}meta.json`, JSON.stringify(meta, null, 2));
   console.log(`  meta.json`);

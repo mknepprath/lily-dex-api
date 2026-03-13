@@ -13,7 +13,6 @@ export async function fetchPokemonGoApi() {
 
   // Build lookup maps from pokedex for supplementary data
   const namesByDex = new Map();
-  const shinyByDex = new Map();
   const assetsByDex = new Map();
   const assetFormsByDex = new Map();
 
@@ -22,18 +21,11 @@ export async function fetchPokemonGoApi() {
     if (!namesByDex.has(dex)) {
       namesByDex.set(dex, entry.names);
     }
-    if (entry.assets?.shinyImage) {
-      shinyByDex.set(dex, true);
-    }
     if (entry.assets) {
       assetsByDex.set(dex, entry.assets);
     }
     if (entry.assetForms?.length > 0) {
       assetFormsByDex.set(dex, entry.assetForms);
-      // Also check assetForms for shiny
-      if (entry.assetForms.some((f) => f.shinyImage)) {
-        shinyByDex.set(dex, true);
-      }
     }
   }
 
@@ -44,7 +36,6 @@ export async function fetchPokemonGoApi() {
     quests: quests.data,
     types: types.data,
     namesByDex,
-    shinyByDex,
     assetsByDex,
     assetFormsByDex,
     status: {

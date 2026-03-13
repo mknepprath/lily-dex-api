@@ -56,6 +56,10 @@ export const ITEM_NAMES = {
   ITEM_MOSSY_LURE: "Mossy Lure Module",
   ITEM_GLACIAL_LURE: "Glacial Lure Module",
   ITEM_RAINY_LURE: "Rainy Lure Module",
+  ITEM_TROY_DISK_MAGNETIC: "Magnetic Lure Module",
+  ITEM_TROY_DISK_MOSSY: "Mossy Lure Module",
+  ITEM_TROY_DISK_GLACIAL: "Glacial Lure Module",
+  ITEM_TROY_DISK_RAINY: "Rainy Lure Module",
 };
 
 export function getGeneration(dexNr) {

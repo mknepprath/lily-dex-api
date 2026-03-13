@@ -76,9 +76,6 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
       }
     }
 
-    // Shiny released from pokemon-go-api
-    const shinyReleased = pokemonGoApi.shinyByDex.get(dex) || false;
-
     // Build sprite URLs from PokeAPI
     const spriteId = dex;
     const artworkBase =
@@ -90,14 +87,20 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
     const apiAssets = pokemonGoApi.assetsByDex.get(dex);
     const assets = apiAssets || {
       image: `${artworkBase}/${spriteId}.png`,
-      shinyImage: shinyReleased ? `${artworkBase}/shiny/${spriteId}.png` : null,
+      shinyImage: `${artworkBase}/shiny/${spriteId}.png`,
     };
 
     // Clean up internal fields
-    const { _buddyDistance, _candyToEvolve, _shadow, _familyId, ...cleanEntry } = gm;
+    const { _candyToEvolve, _shadow, _familyId, ...cleanEntry } = gm;
+
+    // Add PvPoke data
+    const thirdMoveCost = pvpoke.thirdMoveCostByDex.get(dex) || null;
+    const defaultIVs = pvpoke.defaultIVsByDex.get(dex) || null;
 
     output.push({
       ...cleanEntry,
+      thirdMoveCost,
+      defaultIVs,
       assets,
       pixelSprites: {
         image: `${pixelBase}/${spriteId}.png`,

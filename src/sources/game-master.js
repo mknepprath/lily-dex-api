@@ -161,6 +161,15 @@ export async function fetchGameMaster() {
       quests: evo.questDisplay
         ? [{ id: evo.questDisplay.questRequirementTemplateId || "", type: null, names: { English: evo.questDisplay.questRequirementTemplateId || "" } }]
         : null,
+      buddyDistance: evo.kmBuddyDistanceRequirement || null,
+      mustBeBuddy: evo.mustBeBuddy || false,
+      onlyDaytime: evo.onlyDaytime || false,
+      onlyNighttime: evo.onlyNighttime || false,
+      genderRequirement: evo.genderRequirement || null,
+      lureItem: evo.lureItemRequirement
+        ? { id: evo.lureItemRequirement, names: { English: ITEM_NAMES[evo.lureItemRequirement] || idToName(evo.lureItemRequirement) } }
+        : null,
+      tradeEvolution: evo.noCandyCostViaTrade || false,
     }));
 
     // Build regional forms
@@ -201,6 +210,21 @@ export async function fetchGameMaster() {
             id: String(evo.evolution || ""),
             formId: String(evo.form || `${evo.evolution}_NORMAL`),
             candies: evo.candyCost || 0,
+            item: evo.evolutionItemRequirement
+              ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }
+              : null,
+            quests: evo.questDisplay
+              ? [{ id: evo.questDisplay.questRequirementTemplateId || "", type: null, names: { English: evo.questDisplay.questRequirementTemplateId || "" } }]
+              : null,
+            buddyDistance: evo.kmBuddyDistanceRequirement || null,
+            mustBeBuddy: evo.mustBeBuddy || false,
+            onlyDaytime: evo.onlyDaytime || false,
+            onlyNighttime: evo.onlyNighttime || false,
+            genderRequirement: evo.genderRequirement || null,
+            lureItem: evo.lureItemRequirement
+              ? { id: evo.lureItemRequirement, names: { English: ITEM_NAMES[evo.lureItemRequirement] || idToName(evo.lureItemRequirement) } }
+              : null,
+            tradeEvolution: evo.noCandyCostViaTrade || false,
           })),
           hasMegaEvolution: false,
           megaEvolutions: [],
@@ -256,8 +280,8 @@ export async function fetchGameMaster() {
       megaEvolutions: megaEvolutions.length > 0 ? megaEvolutions : [],
       hasGigantamaxEvolution: false,
       assetForms: [],
+      buddyDistance: base.kmBuddyDistance || 0,
       // These will be filled in by merge.js
-      _buddyDistance: base.kmBuddyDistance || 0,
       _candyToEvolve: base.candyToEvolve || 0,
       _shadow: !!base.shadow,
       _familyId: base.familyId || null,
