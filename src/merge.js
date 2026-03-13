@@ -17,8 +17,8 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
     if (!gm || !gm.dexNr) continue;
     const dex = gm.dexNr;
 
-    // Only include released Pokemon
-    if (!pvpoke.releasedDex.has(dex)) continue;
+    // Only include released Pokemon (PvPoke or pokemon-go-api)
+    if (!pvpoke.releasedDex.has(dex) && !pokemonGoApi.namesByDex?.has(dex)) continue;
 
     // Supplement names from pokemon-go-api (has localized names)
     const apiNames = pokemonGoApi.namesByDex?.get(dex);
