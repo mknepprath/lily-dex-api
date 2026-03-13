@@ -8,20 +8,26 @@
 export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
   const output = [];
 
+  if (!gameMaster?.pokemon?.length) {
+    console.warn("  No Game Master pokemon data to merge");
+    return output;
+  }
+
   for (const gm of gameMaster.pokemon) {
+    if (!gm || !gm.dexNr) continue;
     const dex = gm.dexNr;
 
     // Only include released Pokemon
     if (!pvpoke.releasedDex.has(dex)) continue;
 
     // Supplement names from pokemon-go-api (has localized names)
-    const apiNames = pokemonGoApi.namesByDex.get(dex);
+    const apiNames = pokemonGoApi.namesByDex?.get(dex);
     if (apiNames) {
       gm.names = apiNames;
     }
 
     // Supplement move names from pokemon-go-api
-    const apiEntry = pokemonGoApi.pokedex.find((e) => e.dexNr === dex);
+    const apiEntry = pokemonGoApi.pokedex?.find((e) => e.dexNr === dex);
     if (apiEntry) {
       supplementMoveNames(gm.quickMoves, apiEntry.quickMoves);
       supplementMoveNames(gm.cinematicMoves, apiEntry.cinematicMoves);
@@ -34,6 +40,28 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
       }
       if (apiEntry.secondaryType?.names && gm.secondaryType) {
         gm.secondaryType.names = apiEntry.secondaryType.names;
+      }
+
+      // Supplement evolution item names
+      if (apiEntry.evolutions?.length > 0 && gm.evolutions?.length > 0) {
+        for (const gmEvo of gm.evolutions) {
+          if (gmEvo.item?.id) {
+            const apiEvo = apiEntry.evolutions.find(
+              (e) => e.item?.id === gmEvo.item.id
+            );
+            if (apiEvo?.item?.names) {
+              gmEvo.item.names = apiEvo.item.names;
+            }
+          }
+          if (gmEvo.lureItem?.id) {
+            const apiEvo = apiEntry.evolutions.find(
+              (e) => e.item?.id === gmEvo.lureItem.id
+            );
+            if (apiEvo?.item?.names) {
+              gmEvo.lureItem.names = apiEvo.item.names;
+            }
+          }
+        }
       }
 
       // Supplement regional form names, types, and assets
@@ -84,7 +112,7 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
       "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
 
     // Build assets - use pokemon-go-api assets if available, otherwise PokeAPI
-    const apiAssets = pokemonGoApi.assetsByDex.get(dex);
+    const apiAssets = pokemonGoApi.assetsByDex?.get(dex);
     const assets = apiAssets || {
       image: `${artworkBase}/${spriteId}.png`,
       shinyImage: `${artworkBase}/shiny/${spriteId}.png`,

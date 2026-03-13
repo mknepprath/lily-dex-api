@@ -46,6 +46,11 @@ function buildMoveInfo(moveId, movesMap, combatMovesMap) {
 export async function fetchGameMaster() {
   const { data, status, error } = await fetchWithCache("game-master", URL);
 
+  if (!Array.isArray(data)) {
+    console.error("  Game Master data is not an array, skipping parse");
+    return { pokemon: [], status: "error", error: "Invalid data format" };
+  }
+
   // Parse all template types
   const pokemonMap = new Map(); // pokemonId → pokemonSettings
   const formsMap = new Map(); // pokemon → forms array
@@ -54,6 +59,7 @@ export async function fetchGameMaster() {
   const tempEvoMap = new Map(); // pokemon → temp evolution settings
 
   for (const template of data) {
+    if (!template) continue;
     const tid = template.templateId || template.data?.templateId || "";
     const d = template.data || template;
 
@@ -172,9 +178,10 @@ export async function fetchGameMaster() {
       tradeEvolution: evo.noCandyCostViaTrade || false,
     }));
 
-    // Build regional forms
+    // Build regional forms — only true regional variants, not costumes
+    const REGIONAL_SUFFIXES = ["_ALOLA", "_GALARIAN", "_HISUIAN", "_PALDEAN"];
     const regionForms = entries
-      .filter((e) => e.id !== base.id)
+      .filter((e) => e.id !== base.id && REGIONAL_SUFFIXES.some((s) => e.templateId.includes(s)))
       .reduce((acc, regionEntry) => {
         const regionFormId = regionEntry.id;
         const regionQuickMoves = {};

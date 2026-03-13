@@ -4,9 +4,13 @@
   "description": "Pokemon GO data API for lily dex",
   "type": "module",
   "scripts": {
-    "build": "node src/index.js"
+    "build": "node src/index.js",
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
   }
 }

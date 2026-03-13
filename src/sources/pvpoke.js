@@ -19,7 +19,13 @@ export async function fetchPvpoke() {
   const defaultIVsByDex = new Map();
   const speciesIdToDex = new Map();
 
+  if (!Array.isArray(data)) {
+    console.error("  PvPoke data is not an array, skipping parse");
+    return { releasedDex, tagsByDex, buddyByDex, familyByDex, thirdMoveCostByDex, defaultIVsByDex, speciesIdToDex, status: "error", error: "Invalid data format" };
+  }
+
   for (const entry of data) {
+    if (!entry || !entry.dex) continue;
     if (entry.released) releasedDex.add(entry.dex);
 
     speciesIdToDex.set(entry.speciesId, entry.dex);
@@ -69,7 +75,7 @@ export async function fetchPvpRankings(speciesIdToDex) {
   ]);
 
   const mapRankings = (data) =>
-    data.slice(0, 100).map((entry, index) => ({
+    (Array.isArray(data) ? data : []).slice(0, 100).map((entry, index) => ({
       rank: index + 1,
       speciesId: entry.speciesId,
       speciesName: entry.speciesName,

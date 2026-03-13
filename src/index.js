@@ -26,13 +26,24 @@ async function build() {
 
   // Fetch PvP rankings (needs speciesIdToDex from pvpoke)
   console.log("\nFetching PvP rankings...");
-  const rankings = await fetchPvpRankings(pvpoke.speciesIdToDex);
-  sourceStatus.rankings = rankings.status;
+  let rankings;
+  try {
+    rankings = await fetchPvpRankings(pvpoke.speciesIdToDex);
+    sourceStatus.rankings = rankings.status;
+  } catch (err) {
+    console.warn(`  Rankings fetch failed: ${err.message}`);
+    rankings = { great: [], ultra: [], master: [] };
+    sourceStatus.rankings = "error";
+  }
 
   // Merge Pokemon data
   console.log("\nMerging Pokemon data...");
   const pokemon = mergePokemon(gameMaster, pvpoke, pokemonGoApi);
   console.log(`  ${pokemon.length} released Pokemon`);
+
+  if (pokemon.length === 0) {
+    throw new Error("Merge produced 0 Pokemon — aborting to avoid publishing empty data");
+  }
 
   // Write outputs
   console.log("\nWriting output files...");
@@ -40,30 +51,34 @@ async function build() {
   writeFileSync(`${OUTPUT_DIR}pokedex.json`, JSON.stringify(pokemon));
   console.log(`  pokedex.json (${pokemon.length} entries)`);
 
-  writeFileSync(`${OUTPUT_DIR}raidboss.json`, JSON.stringify(pokemonGoApi.raids));
+  writeFileSync(`${OUTPUT_DIR}raidboss.json`, JSON.stringify(pokemonGoApi.raids || []));
   console.log(`  raidboss.json`);
 
   writeFileSync(
     `${OUTPUT_DIR}maxbattles.json`,
-    JSON.stringify(pokemonGoApi.maxBattles)
+    JSON.stringify(pokemonGoApi.maxBattles || [])
   );
   console.log(`  maxbattles.json`);
 
   writeFileSync(
     `${OUTPUT_DIR}quests.json`,
-    JSON.stringify(pokemonGoApi.quests)
+    JSON.stringify(pokemonGoApi.quests || [])
   );
   console.log(`  quests.json`);
 
   writeFileSync(
     `${OUTPUT_DIR}types.json`,
-    JSON.stringify(pokemonGoApi.types)
+    JSON.stringify(pokemonGoApi.types || [])
   );
   console.log(`  types.json`);
 
   writeFileSync(
     `${OUTPUT_DIR}rankings.json`,
-    JSON.stringify({ little: rankings.little, great: rankings.great, ultra: rankings.ultra, master: rankings.master })
+    JSON.stringify({
+      great: rankings.great || [],
+      ultra: rankings.ultra || [],
+      master: rankings.master || [],
+    })
   );
   console.log(`  rankings.json`);
 

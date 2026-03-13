@@ -16,7 +16,18 @@ export async function fetchPokemonGoApi() {
   const assetsByDex = new Map();
   const assetFormsByDex = new Map();
 
+  if (!Array.isArray(pokedex.data)) {
+    console.error("  Pokemon GO API pokedex data is not an array, skipping parse");
+    return {
+      pokedex: [], raids: raids.data || [], maxBattles: maxBattles.data || [],
+      quests: quests.data || [], types: types.data || [],
+      namesByDex, assetsByDex, assetFormsByDex,
+      status: { pokedex: "error", raids: raids.status, maxBattles: maxBattles.status, quests: quests.status, types: types.status },
+    };
+  }
+
   for (const entry of pokedex.data) {
+    if (!entry || !entry.dexNr) continue;
     const dex = entry.dexNr;
     if (!namesByDex.has(dex)) {
       namesByDex.set(dex, entry.names);

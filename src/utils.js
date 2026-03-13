@@ -15,8 +15,12 @@ export async function fetchWithCache(name, url) {
   } catch (err) {
     console.warn(`  ${name}: fetch failed (${err.message}), using cache`);
     if (existsSync(cachePath)) {
-      const data = JSON.parse(readFileSync(cachePath, "utf-8"));
-      return { data, status: "cached", error: err.message };
+      try {
+        const data = JSON.parse(readFileSync(cachePath, "utf-8"));
+        return { data, status: "cached", error: err.message };
+      } catch (parseErr) {
+        throw new Error(`${name}: cache file corrupted and fetch failed: ${err.message}`);
+      }
     }
     throw new Error(`${name}: no cache available and fetch failed: ${err.message}`);
   }
