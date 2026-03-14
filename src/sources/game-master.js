@@ -179,10 +179,22 @@ export async function fetchGameMaster() {
       tradeEvolution: evo.noCandyCostViaTrade || false,
     }));
 
-    // Build regional forms — only true regional variants, not costumes
-    const REGIONAL_SUFFIXES = ["_ALOLA", "_GALARIAN", "_HISUIAN", "_PALDEAN"];
+    // Build regional/alternate forms — any entry that differs from the base
+    // (different stats or types) and isn't a costume variant
+    const COSTUME_PATTERNS = ["_COPY", "_COSTUME", "_FALL", "_WINTER", "_SPRING", "_SUMMER", "_HOLIDAY", "_EVENT"];
     const regionForms = entries
-      .filter((e) => e.id !== base.id && REGIONAL_SUFFIXES.some((s) => e.templateId.includes(s)))
+      .filter((e) => {
+        if (e.id === base.id) return false;
+        // Skip costume variants
+        if (COSTUME_PATTERNS.some((p) => e.templateId.includes(p))) return false;
+        // Include if has different stats or types from base
+        const diffStats = e.stats &&
+          (e.stats.baseAttack !== base.stats?.baseAttack ||
+           e.stats.baseDefense !== base.stats?.baseDefense ||
+           e.stats.baseStamina !== base.stats?.baseStamina);
+        const diffType = e.type !== base.type || e.type2 !== base.type2;
+        return diffStats || diffType;
+      })
       .reduce((acc, regionEntry) => {
         const regionFormId = regionEntry.id;
         const regionQuickMoves = {};
