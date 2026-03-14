@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync } from "fs";
 import { fetchGameMaster } from "./sources/game-master.js";
 import { fetchPvpoke, fetchPvpRankings } from "./sources/pvpoke.js";
 import { fetchPokemonGoApi } from "./sources/pokemon-go-api.js";
+import { fetchEvents } from "./sources/events.js";
 import { mergePokemon } from "./merge.js";
 
 const OUTPUT_DIR = new URL("../output/", import.meta.url).pathname;
@@ -45,6 +46,26 @@ async function build() {
     throw new Error("Merge produced 0 Pokemon — aborting to avoid publishing empty data");
   }
 
+  // Build Pokemon name → dex lookup for event matching
+  const pokemonNames = new Map();
+  for (const p of pokemon) {
+    if (p.names?.English) {
+      pokemonNames.set(p.names.English, p.dexNr);
+    }
+  }
+
+  // Fetch events (non-blocking — doesn't fail the build)
+  console.log("\nFetching events...");
+  let eventsResult;
+  try {
+    eventsResult = await fetchEvents(pokemonNames);
+    sourceStatus.events = eventsResult.status;
+  } catch (err) {
+    console.warn(`  Events fetch failed: ${err.message}`);
+    eventsResult = { events: [] };
+    sourceStatus.events = "error";
+  }
+
   // Write outputs
   console.log("\nWriting output files...");
 
@@ -71,6 +92,12 @@ async function build() {
     JSON.stringify(pokemonGoApi.types || [])
   );
   console.log(`  types.json`);
+
+  writeFileSync(
+    `${OUTPUT_DIR}events.json`,
+    JSON.stringify(eventsResult.events)
+  );
+  console.log(`  events.json (${eventsResult.events.length} events)`);
 
   writeFileSync(
     `${OUTPUT_DIR}rankings.json`,
