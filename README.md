@@ -26,6 +26,36 @@ Pokemon GO data API for [lily dex](https://github.com/mknepprath/lily-dex). Aggr
 | `quests.json` | Field research quests |
 | `meta.json` | Build metadata: timestamp, source status, Pokemon count |
 
+## Events
+
+Events are parsed from the [GO Calendar](https://github.com/othyn/go-calendar) ICS feed. The parser:
+
+- Unfolds ICS line continuations and extracts VEVENT fields
+- Skips VALARM sub-blocks to avoid overwriting event descriptions
+- Filters out template/example/demo events
+- Extracts event tags from summary prefixes (e.g. `[CD]`, `[RB]`, `[SH]`)
+- Keeps timestamps as **naive strings** (no timezone) — Pokemon GO events happen at local time, so the app interprets them in the user's local timezone
+- Matches Pokemon names in event titles to dex numbers using tag-specific patterns
+
+**Event tags:** `CD` (Community Day), `RB` (Raid Boss), `RH` (Raid Hour), `SH` (Spotlight Hour), `MM` (Max Monday), `MB` (Max Battle), `GBL` (GO Battle League), `E` (Event), `R` (Research), `RD` (Research Day), `GP` (GO Party), `PGF` (Pokemon GO Fest)
+
+**Schema:**
+```json
+{
+  "id": "march-communityday2026",
+  "summary": "[CD] Scorbunny Community Day",
+  "tag": "CD",
+  "title": "Scorbunny Community Day",
+  "description": "Starts at 14:00, ends at 17:00.",
+  "startDate": "2026-03-14T14:00:00",
+  "endDate": "2026-03-14T17:00:00",
+  "isAllDay": false,
+  "url": "https://leekduck.com/events/march-communityday2026/",
+  "imageURL": "https://cdn.leekduck.com/...",
+  "pokemonDexNrs": [813]
+}
+```
+
 ## Build
 
 ```sh
