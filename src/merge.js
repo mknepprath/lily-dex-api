@@ -17,8 +17,8 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
     if (!gm || !gm.dexNr) continue;
     const dex = gm.dexNr;
 
-    // Only include released Pokemon (PvPoke released OR pokemon-go-api has assets)
-    if (!pvpoke.releasedDex.has(dex) && !pokemonGoApi.assetsByDex?.has(dex)) continue;
+    // Determine release status
+    const released = pvpoke.releasedDex.has(dex) || pokemonGoApi.assetsByDex?.has(dex) || false;
 
     // Supplement names from pokemon-go-api (has localized names)
     const apiNames = pokemonGoApi.namesByDex?.get(dex);
@@ -128,6 +128,7 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
 
     output.push({
       ...cleanEntry,
+      released,
       thirdMoveCost,
       defaultIVs,
       tags,
