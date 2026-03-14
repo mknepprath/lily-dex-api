@@ -45,6 +45,7 @@ function parseICS(icsText, pokemonNames) {
     if (!fields.UID || !fields.SUMMARY) continue;
 
     const summary = unescapeICS(fields.SUMMARY);
+    if (/example|template|demo|test/i.test(summary)) continue;
     const { tag, title } = parseTag(summary);
 
     // Parse dates — keep as naive strings
