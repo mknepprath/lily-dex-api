@@ -81,6 +81,10 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
           if (apiForm?.secondaryType?.names && form.secondaryType) {
             form.secondaryType.names = apiForm.secondaryType.names;
           }
+          // Calculate PvP IVs for this form
+          if (form.stats) {
+            form.defaultIVs = calculateDefaultIVs(form.stats);
+          }
           // Match assets from apiForm or from base assetForms by form suffix
           if (apiForm?.assets) {
             form.assets = apiForm.assets;
