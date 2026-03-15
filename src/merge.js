@@ -5,6 +5,8 @@
  *           pvpoke (released, tags) >
  *           pokemon-go-api (names, shiny, raids, quests)
  */
+import { calculateDefaultIVs } from "./iv-calc.js";
+
 export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
   const output = [];
 
@@ -149,7 +151,7 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
 
     // Add PvPoke data
     const thirdMoveCost = pvpoke.thirdMoveCostByDex.get(dex) || null;
-    const defaultIVs = pvpoke.defaultIVsByDex.get(dex) || null;
+    const defaultIVs = calculateDefaultIVs(gm.stats);
     const tags = pvpoke.tagsByDex.get(dex) || [];
 
     output.push({
