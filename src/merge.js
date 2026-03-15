@@ -7,7 +7,7 @@
  */
 import { calculateDefaultIVs } from "./iv-calc.js";
 
-export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
+export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi) {
   const output = [];
 
   if (!gameMaster?.pokemon?.length) {
@@ -158,12 +158,16 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi) {
     const defaultIVs = calculateDefaultIVs(gm.stats);
     const tags = pvpoke.tagsByDex.get(dex) || [];
 
+    // Full evolution family from PokeAPI
+    const evolutionFamily = pokeapi?.familyByDex?.get(dex) || [];
+
     output.push({
       ...cleanEntry,
       released,
       thirdMoveCost,
       defaultIVs,
       tags,
+      evolutionFamily,
       assets,
       pixelSprites: {
         image: `${pixelBase}/${spriteId}.png`,

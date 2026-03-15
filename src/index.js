@@ -3,6 +3,7 @@ import { fetchGameMaster } from "./sources/game-master.js";
 import { fetchPvpoke, fetchPvpRankings } from "./sources/pvpoke.js";
 import { fetchPokemonGoApi } from "./sources/pokemon-go-api.js";
 import { fetchEvents } from "./sources/events.js";
+import { fetchEvolutionChains } from "./sources/pokeapi.js";
 import { mergePokemon } from "./merge.js";
 
 const OUTPUT_DIR = new URL("../output/", import.meta.url).pathname;
@@ -15,15 +16,17 @@ async function build() {
 
   // Fetch all sources in parallel
   console.log("Fetching sources...");
-  const [gameMaster, pvpoke, pokemonGoApi] = await Promise.all([
+  const [gameMaster, pvpoke, pokemonGoApi, pokeapi] = await Promise.all([
     fetchGameMaster(),
     fetchPvpoke(),
     fetchPokemonGoApi(),
+    fetchEvolutionChains(),
   ]);
 
   sourceStatus.gameMaster = gameMaster.status;
   sourceStatus.pvpoke = pvpoke.status;
   sourceStatus.pokemonGoApi = pokemonGoApi.status;
+  sourceStatus.pokeapi = pokeapi.status;
 
   // Fetch PvP rankings (needs speciesIdToDex from pvpoke)
   console.log("\nFetching PvP rankings...");
@@ -39,7 +42,7 @@ async function build() {
 
   // Merge Pokemon data
   console.log("\nMerging Pokemon data...");
-  const pokemon = mergePokemon(gameMaster, pvpoke, pokemonGoApi);
+  const pokemon = mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi);
   console.log(`  ${pokemon.length} released Pokemon`);
 
   if (pokemon.length === 0) {
