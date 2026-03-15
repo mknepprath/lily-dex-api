@@ -57,6 +57,7 @@ export async function fetchGameMaster() {
   const movesMap = new Map(); // moveId → move data
   const combatMovesMap = new Map(); // moveId → combat move data
   const tempEvoMap = new Map(); // pokemon → temp evolution settings
+  const questTemplateMap = new Map(); // questId → human-readable description
 
   for (const template of data) {
     if (!template) continue;
@@ -104,6 +105,28 @@ export async function fetchGameMaster() {
         d.temporaryEvolutionSettings.pokemonId,
         d.temporaryEvolutionSettings.temporaryEvolutions || []
       );
+    }
+
+    if (d.evolutionQuestTemplate) {
+      const eq = d.evolutionQuestTemplate;
+      const questId = eq.questTemplateId;
+      const target = eq.goals?.[0]?.target;
+      const questType = eq.questType || "";
+      let displayName = "";
+      if (questType.includes("AFFECTION") && target) {
+        displayName = `Earn ${target} hearts as buddy`;
+      } else if (questType.includes("WALK") && target) {
+        displayName = `Walk ${target}km as buddy`;
+      } else if (questType.includes("BATTLE") && target) {
+        displayName = `Win ${target} battles as buddy`;
+      } else if (questType.includes("FEED") && target) {
+        displayName = `Feed ${target} treats as buddy`;
+      } else if (target) {
+        displayName = `Complete quest (${target})`;
+      }
+      if (questId && displayName) {
+        questTemplateMap.set(questId, displayName);
+      }
     }
   }
 
@@ -165,8 +188,12 @@ export async function fetchGameMaster() {
       item: evo.evolutionItemRequirement
         ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }
         : null,
-      quests: evo.questDisplay
-        ? [{ id: evo.questDisplay.questRequirementTemplateId || "", type: null, names: { English: evo.questDisplay.questRequirementTemplateId || "" } }]
+      quests: evo.questDisplay?.length > 0
+        ? evo.questDisplay.map((qd) => {
+            const questId = qd.questRequirementTemplateId || "";
+            const displayName = questTemplateMap.get(questId) || "";
+            return { id: questId, type: null, names: { English: displayName } };
+          }).filter((q) => q.names.English && !(evo.kmBuddyDistanceRequirement && q.names.English.startsWith("Walk")))
         : null,
       buddyDistance: evo.kmBuddyDistanceRequirement || null,
       mustBeBuddy: evo.mustBeBuddy || false,
