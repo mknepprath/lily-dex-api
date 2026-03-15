@@ -124,32 +124,6 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi) {
       shinyImage: `${artworkBase}/shiny/${spriteId}.png`,
     };
 
-    // Supplement missing evolutions from PvPoke family data
-    if ((!gm.evolutions || gm.evolutions.length === 0) && pvpoke.familyByDex?.has(dex)) {
-      const family = pvpoke.familyByDex.get(dex);
-      if (family?.evolutions?.length > 0) {
-        gm.evolutions = family.evolutions.map((evoSpeciesId) => {
-          const evoDex = pvpoke.speciesIdToDex?.get(evoSpeciesId) || null;
-          const evoId = evoSpeciesId.toUpperCase();
-          return {
-            id: evoId,
-            formId: `${evoId}_NORMAL`,
-            dexNr: evoDex,
-            candies: 0,
-            item: null,
-            quests: null,
-            buddyDistance: null,
-            mustBeBuddy: false,
-            onlyDaytime: false,
-            onlyNighttime: false,
-            genderRequirement: null,
-            lureItem: null,
-            tradeEvolution: false,
-          };
-        });
-      }
-    }
-
     // Clean up internal fields
     const { _candyToEvolve, _shadow, _familyId, ...cleanEntry } = gm;
 
