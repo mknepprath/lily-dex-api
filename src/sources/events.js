@@ -25,7 +25,63 @@ export async function fetchEvents(pokemonNames) {
   const events = parseICS(icsText, pokemonNames);
   console.log(`  ${events.length} events parsed`);
 
+  // Enrich events with Pokemon from Leek Duck pages
+  await enrichFromLeekDuck(events);
+
   return { events, status: "fresh" };
+}
+
+/**
+ * Scrape Leek Duck event pages for Pokemon not captured by title matching.
+ * Extracts dex numbers from pokemon_icon_XXX_YY image filenames.
+ */
+async function enrichFromLeekDuck(events) {
+  const toEnrich = events.filter(
+    (e) => e.url && e.url.includes("leekduck.com")
+  );
+  if (toEnrich.length === 0) return;
+
+  console.log(`  Enriching ${toEnrich.length} events from Leek Duck...`);
+  let enriched = 0;
+
+  // Fetch in batches of 5 to avoid hammering the server
+  for (let i = 0; i < toEnrich.length; i += 5) {
+    const batch = toEnrich.slice(i, i + 5);
+    const results = await Promise.allSettled(
+      batch.map(async (event) => {
+        try {
+          const res = await fetch(event.url, { signal: AbortSignal.timeout(10000) });
+          if (!res.ok) return;
+          const html = await res.text();
+          const scraped = extractDexNrsFromHTML(html);
+          if (scraped.length > 0) {
+            // Merge with existing (title-matched) dex numbers
+            const merged = [...new Set([...event.pokemonDexNrs, ...scraped])];
+            event.pokemonDexNrs = merged;
+            enriched++;
+          }
+        } catch {
+          // Skip silently — enrichment is best-effort
+        }
+      })
+    );
+  }
+
+  console.log(`  ${enriched} events enriched with Pokemon from Leek Duck`);
+}
+
+/**
+ * Extract Pokemon dex numbers from Leek Duck HTML.
+ * Matches pokemon_icon_XXX_YY patterns in image URLs.
+ */
+function extractDexNrsFromHTML(html) {
+  const matches = html.matchAll(/pokemon_icon_(\d{3,4})_\d+/g);
+  const dexNrs = new Set();
+  for (const m of matches) {
+    const nr = parseInt(m[1], 10);
+    if (nr > 0 && nr < 2000) dexNrs.add(nr);
+  }
+  return [...dexNrs];
 }
 
 /**
