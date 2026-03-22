@@ -37,7 +37,7 @@ export async function fetchEvents(pokemonNames) {
  */
 async function enrichFromLeekDuck(events) {
   const toEnrich = events.filter(
-    (e) => e.url && e.url.includes("leekduck.com")
+    (e) => e.url && e.url.includes("leekduck.com") && e.tag !== "GBL"
   );
   if (toEnrich.length === 0) return;
 
