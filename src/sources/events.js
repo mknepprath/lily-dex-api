@@ -110,7 +110,7 @@ function extractDexNrsFromHTML(html) {
     }
   }
 
-  return [...dexNrs];
+  return [...dexNrs].sort((a, b) => a - b);
 }
 
 /**
