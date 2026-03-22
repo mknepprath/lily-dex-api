@@ -8,7 +8,7 @@
 import { calculateDefaultIVs } from "./iv-calc.js";
 import { buildMoveInfo } from "./sources/game-master.js";
 
-export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi) {
+export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi, overrides = {}) {
   const output = [];
 
   if (!gameMaster?.pokemon?.length) {
@@ -152,6 +152,16 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi) {
         shinyImage: `${pixelBase}/shiny/${spriteId}.png`,
       },
     });
+  }
+
+  // Apply maintainer overrides
+  for (const entry of output) {
+    const override = overrides[String(entry.dexNr)];
+    if (!override) continue;
+    for (const [key, value] of Object.entries(override)) {
+      if (key.startsWith("_")) continue; // skip _comment
+      entry[key] = value;
+    }
   }
 
   // Sort by dex number

@@ -40,9 +40,22 @@ async function build() {
     sourceStatus.rankings = "error";
   }
 
+  // Load maintainer overrides
+  const overridesPath = new URL("../data/overrides.json", import.meta.url).pathname;
+  let overrides = {};
+  if (existsSync(overridesPath)) {
+    try {
+      overrides = JSON.parse(readFileSync(overridesPath, "utf-8"));
+      const count = Object.keys(overrides).length;
+      if (count > 0) console.log(`  ${count} override(s) loaded`);
+    } catch (err) {
+      console.warn(`  Overrides failed: ${err.message}`);
+    }
+  }
+
   // Merge Pokemon data
   console.log("\nMerging Pokemon data...");
-  const pokemon = mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi);
+  const pokemon = mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi, overrides);
   console.log(`  ${pokemon.length} released Pokemon`);
 
   if (pokemon.length === 0) {
