@@ -6,6 +6,7 @@
  *           pokemon-go-api (names, shiny, raids, quests)
  */
 import { calculateDefaultIVs } from "./iv-calc.js";
+import { buildMoveInfo } from "./sources/game-master.js";
 
 export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi) {
   const output = [];
@@ -27,6 +28,9 @@ export function mergePokemon(gameMaster, pvpoke, pokemonGoApi, pokeapi) {
     if (apiNames) {
       gm.names = apiNames;
     }
+
+    // Supplement moves from PvPoke (includes legacy/signature moves missing from Game Master)
+    supplementMovesFromPvPoke(gm, pvpoke, gameMaster);
 
     // Supplement move names from pokemon-go-api
     const apiEntry = pokemonGoApi.pokedex?.find((e) => e.dexNr === dex);
@@ -165,6 +169,67 @@ function supplementMoveNames(gmMoves, apiMoves) {
       if (apiMove.names) gmMove.names = apiMove.names;
       if (apiMove.type?.names && gmMove.type) {
         gmMove.type.names = apiMove.type.names;
+      }
+    }
+  }
+}
+
+/**
+ * Add moves from PvPoke that the Game Master doesn't include.
+ * Handles signature moves (Behemoth Bash), legacy moves, etc.
+ */
+function supplementMovesFromPvPoke(gm, pvpoke, gameMaster) {
+  if (!pvpoke.movesBySpeciesId || !gameMaster.movesMap) return;
+
+  const { movesMap, combatMovesMap } = gameMaster;
+
+  // Try to find PvPoke entry by formId or pokemonId
+  // PvPoke uses bare names (mewtwo), GM uses MEWTWO_NORMAL — try both
+  const formId = gm.formId || gm.pokemonId || "";
+  const pvpId = formId.toLowerCase();
+  const pvpIdBase = pvpId.replace(/_normal$/, "");
+  const pvpMoves = pvpoke.movesBySpeciesId.get(pvpId) || pvpoke.movesBySpeciesId.get(pvpIdBase);
+
+  // Supplement base form charged moves
+  if (pvpMoves && gm.cinematicMoves && typeof gm.cinematicMoves === "object" && !Array.isArray(gm.cinematicMoves)) {
+    for (const moveId of pvpMoves.chargedMoves) {
+      if (!gm.cinematicMoves[moveId]) {
+        const info = buildMoveInfo(moveId, movesMap, combatMovesMap);
+        if (info) {
+          gm.cinematicMoves[moveId] = info;
+        }
+      }
+    }
+    // Also add elite charged moves
+    for (const moveId of pvpMoves?.eliteChargedMoves || []) {
+      if (!gm.eliteCinematicMoves?.[moveId] && !gm.cinematicMoves[moveId]) {
+        const info = buildMoveInfo(moveId, movesMap, combatMovesMap);
+        if (info) {
+          if (!gm.eliteCinematicMoves || Array.isArray(gm.eliteCinematicMoves)) {
+            gm.eliteCinematicMoves = {};
+          }
+          gm.eliteCinematicMoves[moveId] = info;
+        }
+      }
+    }
+  }
+
+  // Supplement regional form moves too
+  if (gm.regionForms && typeof gm.regionForms === "object" && !Array.isArray(gm.regionForms)) {
+    for (const [formKey, form] of Object.entries(gm.regionForms)) {
+      const formPvpId = formKey.toLowerCase();
+      const formPvpMoves = pvpoke.movesBySpeciesId.get(formPvpId);
+      if (!formPvpMoves) continue;
+
+      if (form.cinematicMoves && typeof form.cinematicMoves === "object" && !Array.isArray(form.cinematicMoves)) {
+        for (const moveId of formPvpMoves.chargedMoves) {
+          if (!form.cinematicMoves[moveId]) {
+            const info = buildMoveInfo(moveId, movesMap, combatMovesMap);
+            if (info) {
+              form.cinematicMoves[moveId] = info;
+            }
+          }
+        }
       }
     }
   }

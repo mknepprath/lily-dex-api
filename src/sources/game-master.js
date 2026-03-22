@@ -12,7 +12,7 @@ function buildTypeInfo(typeEnum) {
   };
 }
 
-function buildMoveInfo(moveId, movesMap, combatMovesMap) {
+export function buildMoveInfo(moveId, movesMap, combatMovesMap) {
   if (!moveId || typeof moveId !== "string") return null;
   const move = movesMap.get(moveId) || movesMap.get(moveId + "_FAST");
   const combat = combatMovesMap.get(moveId) || combatMovesMap.get(moveId + "_FAST");
@@ -336,5 +336,5 @@ export async function fetchGameMaster() {
     });
   }
 
-  return { pokemon, status, error };
+  return { pokemon, movesMap, combatMovesMap, status, error };
 }

@@ -18,6 +18,7 @@ export async function fetchPvpoke() {
   const thirdMoveCostByDex = new Map();
   const defaultIVsByDex = new Map();
   const speciesIdToDex = new Map();
+  const movesBySpeciesId = new Map();
 
   if (!Array.isArray(data)) {
     console.error("  PvPoke data is not an array, skipping parse");
@@ -49,6 +50,13 @@ export async function fetchPvpoke() {
     if (entry.defaultIVs && !defaultIVsByDex.has(entry.dex)) {
       defaultIVsByDex.set(entry.dex, entry.defaultIVs);
     }
+
+    // Store move lists by speciesId (includes legacy/signature moves)
+    movesBySpeciesId.set(entry.speciesId, {
+      fastMoves: (entry.fastMoves || []).map((m) => m + "_FAST"),
+      chargedMoves: entry.chargedMoves || [],
+      eliteChargedMoves: entry.eliteChargedMoves || [],
+    });
   }
 
   return {
@@ -59,6 +67,7 @@ export async function fetchPvpoke() {
     thirdMoveCostByDex,
     defaultIVsByDex,
     speciesIdToDex,
+    movesBySpeciesId,
     status,
     error,
   };
