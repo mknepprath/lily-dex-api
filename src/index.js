@@ -108,9 +108,10 @@ async function build() {
       great: rankings.great || [],
       ultra: rankings.ultra || [],
       master: rankings.master || [],
+      returnPokemon: rankings.returnPokemon || [],
     })
   );
-  console.log(`  rankings.json`);
+  console.log(`  rankings.json (${(rankings.returnPokemon || []).length} Return Pokemon)`);
 
   // Meta file
   const meta = {

@@ -64,6 +64,46 @@ export async function fetchPvpoke() {
   };
 }
 
+/**
+ * Scan full rankings for Pokemon whose recommended moveset includes Return
+ * and who outrank their shadow counterpart. These are worth purifying.
+ */
+function findReturnPokemon(leagueDataArrays, speciesIdToDex) {
+  const returnDexNrs = new Set();
+
+  for (const data of leagueDataArrays) {
+    if (!Array.isArray(data)) continue;
+
+    // Build rank lookup: speciesId → rank (1-indexed)
+    const ranks = new Map();
+    for (let i = 0; i < data.length; i++) {
+      ranks.set(data[i].speciesId, i + 1);
+    }
+
+    for (const [speciesId, rank] of ranks) {
+      const entry = data[rank - 1];
+      const moveset = entry.moveset || [];
+      if (!moveset.includes("RETURN")) continue;
+
+      // Compare to shadow version
+      const base = speciesId.replace(/_shadow$/, "");
+      const shadowId = base + "_shadow";
+      const shadowRank = ranks.get(shadowId);
+
+      // Include if Return version ranks better than shadow (or no shadow exists)
+      if (!shadowRank || rank < shadowRank) {
+        const dex =
+          speciesIdToDex.get(speciesId) ||
+          speciesIdToDex.get(base) ||
+          null;
+        if (dex) returnDexNrs.add(dex);
+      }
+    }
+  }
+
+  return [...returnDexNrs];
+}
+
 export async function fetchPvpRankings(speciesIdToDex) {
   const RANKINGS_BASE = `${BASE}/rankings/all/overall`;
 
@@ -90,11 +130,18 @@ export async function fetchPvpRankings(speciesIdToDex) {
       counters: (entry.counters || []).slice(0, 5),
     }));
 
+  // Find Pokemon where purified (with Return) outranks shadow in any league
+  const returnPokemon = findReturnPokemon(
+    [little.data, great.data, ultra.data, master.data],
+    speciesIdToDex
+  );
+
   return {
     little: mapRankings(little.data),
     great: mapRankings(great.data),
     ultra: mapRankings(ultra.data),
     master: mapRankings(master.data),
+    returnPokemon,
     status: { little: little.status, great: great.status, ultra: ultra.status, master: master.status },
   };
 }
