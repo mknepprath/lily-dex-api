@@ -72,15 +72,44 @@ async function enrichFromLeekDuck(events) {
 
 /**
  * Extract Pokemon dex numbers from Leek Duck HTML.
- * Matches pokemon_icon_XXX_YY patterns in image URLs.
+ * Matches two image naming patterns:
+ *   - pokemon_icon_XXX_YY (standard sprites)
+ *   - pmXXX.cCOSTUME.icon.png (costumed Pokemon)
+ *
+ * Excludes Pokemon mentioned in "not eligible" / "not allowed" contexts.
  */
 function extractDexNrsFromHTML(html) {
-  const matches = html.matchAll(/pokemon_icon_(\d{3,4})_\d+/g);
   const dexNrs = new Set();
-  for (const m of matches) {
+
+  // Standard: pokemon_icon_010_00
+  for (const m of html.matchAll(/pokemon_icon_(\d{3,4})_\d+/g)) {
     const nr = parseInt(m[1], 10);
     if (nr > 0 && nr < 2000) dexNrs.add(nr);
   }
+
+  // Costumed: pm12.cFASHION_2021.icon.png
+  for (const m of html.matchAll(/pm(\d{1,4})\.c[A-Z0-9_]+\.(?:s\.)?icon\.png/g)) {
+    const nr = parseInt(m[1], 10);
+    if (nr > 0 && nr < 2000) dexNrs.add(nr);
+  }
+
+  // Remove Pokemon listed after "not allowed" / "not eligible" text
+  // Leek Duck uses: <p>...not be allowed...</p><ul class="pkmn-list-flex">...<li>icons</li>...</ul>
+  const excludeSections = html.matchAll(
+    /(?:not (?:be )?(?:allowed|eligible)|cannot (?:be used|participate))[^]*?<ul[^>]*class="pkmn-list-flex"[^>]*>([\s\S]*?)<\/ul>/gi
+  );
+  for (const section of excludeSections) {
+    const listHTML = section[1];
+    for (const m of listHTML.matchAll(/pokemon_icon_(\d{3,4})_\d+/g)) {
+      const nr = parseInt(m[1], 10);
+      if (nr > 0) dexNrs.delete(nr);
+    }
+    for (const m of listHTML.matchAll(/pm(\d{1,4})\.(?:c[A-Z0-9_]+\.)?(?:s\.)?icon\.png/g)) {
+      const nr = parseInt(m[1], 10);
+      if (nr > 0) dexNrs.delete(nr);
+    }
+  }
+
   return [...dexNrs];
 }
 
