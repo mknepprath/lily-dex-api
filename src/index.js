@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { fetchGameMaster } from "./sources/game-master.js";
 import { fetchPvpoke, fetchPvpRankings } from "./sources/pvpoke.js";
 import { fetchPokemonGoApi } from "./sources/pokemon-go-api.js";
@@ -67,6 +67,41 @@ async function build() {
     console.warn(`  Events fetch failed: ${err.message}`);
     eventsResult = { events: [] };
     sourceStatus.events = "error";
+  }
+
+  // Merge announcements into events
+  const announcementsPath = new URL("../data/announcements.json", import.meta.url).pathname;
+  if (existsSync(announcementsPath)) {
+    try {
+      const announcements = JSON.parse(readFileSync(announcementsPath, "utf-8"));
+      let added = 0;
+      for (const a of announcements) {
+        if (!a.id || !a.startDate || !a.endDate) continue;
+        // Skip announcements older than 30 days
+        const endDate = new Date(a.endDate);
+        if (endDate < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) continue;
+        eventsResult.events.push({
+          id: a.id,
+          summary: `[LD] ${a.title}`,
+          tag: "LD",
+          title: a.title,
+          description: a.description || "",
+          startDate: a.startDate,
+          endDate: a.endDate,
+          isAllDay: true,
+          url: a.url || null,
+          imageURL: a.imageURL || null,
+          pokemonDexNrs: a.pokemonDexNrs || [],
+        });
+        added++;
+      }
+      if (added > 0) {
+        eventsResult.events.sort((a, b) => a.startDate.localeCompare(b.startDate));
+        console.log(`  ${added} announcement(s) merged into events`);
+      }
+    } catch (err) {
+      console.warn(`  Announcements failed: ${err.message}`);
+    }
   }
 
   // Write outputs
