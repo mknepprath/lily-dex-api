@@ -1,6 +1,6 @@
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { fetchGameMaster } from "./sources/game-master.js";
-import { fetchPvpoke, fetchPvpRankings } from "./sources/pvpoke.js";
+import { fetchPvpoke, fetchPvpRankings, fetchCupRankings } from "./sources/pvpoke.js";
 import { fetchPokemonGoApi } from "./sources/pokemon-go-api.js";
 import { fetchEvents } from "./sources/events.js";
 import { fetchEvolutionChains } from "./sources/pokeapi.js";
@@ -117,6 +117,15 @@ async function build() {
     }
   }
 
+  // Fetch cup-specific rankings for active GBL events
+  console.log("\nFetching cup rankings...");
+  let cupRankings = [];
+  try {
+    cupRankings = await fetchCupRankings(eventsResult.events, pvpoke.speciesIdToDex);
+  } catch (err) {
+    console.warn(`  Cup rankings fetch failed: ${err.message}`);
+  }
+
   // Write outputs
   console.log("\nWriting output files...");
 
@@ -157,9 +166,10 @@ async function build() {
       ultra: rankings.ultra || [],
       master: rankings.master || [],
       returnPokemon: rankings.returnPokemon || [],
+      cups: cupRankings,
     })
   );
-  console.log(`  rankings.json (${(rankings.returnPokemon || []).length} Return Pokemon)`);
+  console.log(`  rankings.json (${(rankings.returnPokemon || []).length} Return Pokemon, ${cupRankings.length} cup(s))`);
 
   // Meta file
   const meta = {

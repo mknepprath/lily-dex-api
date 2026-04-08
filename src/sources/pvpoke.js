@@ -113,6 +113,22 @@ function findReturnPokemon(leagueDataArrays, speciesIdToDex) {
   return [...returnDexNrs];
 }
 
+const mapRankings = (data, speciesIdToDex) =>
+  (Array.isArray(data) ? data : []).slice(0, 100).map((entry, index) => ({
+    rank: index + 1,
+    speciesId: entry.speciesId,
+    speciesName: entry.speciesName,
+    dexNr:
+      speciesIdToDex.get(entry.speciesId) ||
+      speciesIdToDex.get(entry.speciesId.replace(/_shadow$/, "")) ||
+      null,
+    rating: entry.rating,
+    moveset: entry.moveset,
+    movesetNames: (entry.moveset || []).map(moveIdToName),
+    matchups: (entry.matchups || []).slice(0, 5),
+    counters: (entry.counters || []).slice(0, 5),
+  }));
+
 export async function fetchPvpRankings(speciesIdToDex) {
   const RANKINGS_BASE = `${BASE}/rankings/all/overall`;
 
@@ -123,22 +139,6 @@ export async function fetchPvpRankings(speciesIdToDex) {
     fetchWithCache("rankings-10000", `${RANKINGS_BASE}/rankings-10000.json`),
   ]);
 
-  const mapRankings = (data) =>
-    (Array.isArray(data) ? data : []).slice(0, 100).map((entry, index) => ({
-      rank: index + 1,
-      speciesId: entry.speciesId,
-      speciesName: entry.speciesName,
-      dexNr:
-        speciesIdToDex.get(entry.speciesId) ||
-        speciesIdToDex.get(entry.speciesId.replace(/_shadow$/, "")) ||
-        null,
-      rating: entry.rating,
-      moveset: entry.moveset,
-      movesetNames: (entry.moveset || []).map(moveIdToName),
-      matchups: (entry.matchups || []).slice(0, 5),
-      counters: (entry.counters || []).slice(0, 5),
-    }));
-
   // Find Pokemon where purified (with Return) outranks shadow in any league
   const returnPokemon = findReturnPokemon(
     [little.data, great.data, ultra.data, master.data],
@@ -146,11 +146,65 @@ export async function fetchPvpRankings(speciesIdToDex) {
   );
 
   return {
-    little: mapRankings(little.data),
-    great: mapRankings(great.data),
-    ultra: mapRankings(ultra.data),
-    master: mapRankings(master.data),
+    little: mapRankings(little.data, speciesIdToDex),
+    great: mapRankings(great.data, speciesIdToDex),
+    ultra: mapRankings(ultra.data, speciesIdToDex),
+    master: mapRankings(master.data, speciesIdToDex),
     returnPokemon,
     status: { little: little.status, great: great.status, ultra: ultra.status, master: master.status },
   };
+}
+
+/**
+ * Parse GBL event titles to extract specialty cup identifiers.
+ * Titles look like: "Ultra League and Fantasy Cup: Great League Edition | Memories in Motion"
+ * The cup name is always between "and " and " Cup".
+ */
+function parseCupsFromEvents(events) {
+  const cups = new Map(); // id → display name
+  // Match "and {CupName} Cup" — captures the word(s) between "and" and "Cup"
+  const cupPattern = /\band\s+(\w[\w\s]*?)\s+Cup\b/gi;
+
+  for (const event of events) {
+    if (event.tag !== "GBL") continue;
+    const title = event.title || "";
+    let match;
+    while ((match = cupPattern.exec(title)) !== null) {
+      const rawName = match[1].trim();
+      const id = rawName.toLowerCase().replace(/\s+/g, "");
+      cups.set(id, `${rawName} Cup`);
+    }
+  }
+
+  return [...cups.entries()].map(([id, name]) => ({ id, name }));
+}
+
+/**
+ * Fetch rankings for active specialty cups from PvPoke.
+ * Silently skips cups with no data available.
+ */
+export async function fetchCupRankings(events, speciesIdToDex) {
+  const cups = parseCupsFromEvents(events);
+  if (cups.length === 0) return [];
+
+  console.log(`  Found ${cups.length} specialty cup(s): ${cups.map((c) => c.name).join(", ")}`);
+
+  const results = [];
+  for (const cup of cups) {
+    const url = `${BASE}/rankings/${cup.id}/overall/rankings-1500.json`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rankings = mapRankings(data, speciesIdToDex);
+      if (rankings.length > 0) {
+        results.push({ id: cup.id, name: cup.name, cp: 1500, rankings });
+        console.log(`  ${cup.name}: ${rankings.length} rankings`);
+      }
+    } catch (err) {
+      console.warn(`  ${cup.name}: no data available (${err.message})`);
+    }
+  }
+
+  return results;
 }
