@@ -200,10 +200,10 @@ function supplementMovesFromPvPoke(gm, pvpoke, gameMaster) {
   const pvpIdBase = pvpId.replace(/_normal$/, "");
   const pvpMoves = pvpoke.movesBySpeciesId.get(pvpId) || pvpoke.movesBySpeciesId.get(pvpIdBase);
 
-  // Supplement base form charged moves
+  // Supplement base form charged moves (skip moves already in elite list)
   if (pvpMoves && gm.cinematicMoves && typeof gm.cinematicMoves === "object" && !Array.isArray(gm.cinematicMoves)) {
     for (const moveId of pvpMoves.chargedMoves) {
-      if (!gm.cinematicMoves[moveId]) {
+      if (!gm.cinematicMoves[moveId] && !gm.eliteCinematicMoves?.[moveId]) {
         const info = buildMoveInfo(moveId, movesMap, combatMovesMap);
         if (info) {
           gm.cinematicMoves[moveId] = info;

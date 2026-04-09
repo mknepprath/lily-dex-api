@@ -178,22 +178,33 @@ export async function fetchPvpRankings(speciesIdToDex, speciesIdToName) {
 
 /**
  * Parse GBL event titles to extract specialty cup identifiers.
- * Titles look like: "Ultra League and Fantasy Cup: Great League Edition | Memories in Motion"
- * The cup name is always between "and " and " Cup".
+ * Handles multiple naming formats:
+ *   "Ultra League and Fantasy Cup: Great League Edition | Memories in Motion"
+ *   "2025 Championship Series Cup and Master League: Mega Edition"
+ *   "Fantasy Cup: Great League Edition | Memories in Motion"
  */
+const STANDARD_LEAGUES = new Set(["great league", "ultra league", "master league"]);
+
 function parseCupsFromEvents(events) {
   const cups = new Map(); // id → display name
-  // Match "and {CupName} Cup" — captures the word(s) between "and" and "Cup"
-  const cupPattern = /\band\s+(\w[\w\s]*?)\s+Cup\b/gi;
 
   for (const event of events) {
     if (event.tag !== "GBL") continue;
-    const title = event.title || "";
-    let match;
-    while ((match = cupPattern.exec(title)) !== null) {
-      const rawName = match[1].trim();
-      const id = rawName.toLowerCase().replace(/\s+/g, "");
-      cups.set(id, `${rawName} Cup`);
+    // Strip season suffix: "| Memories in Motion" etc.
+    const title = (event.title || "").replace(/\s*\|.*$/, "").trim();
+
+    // Split on "and" or commas to isolate each segment, then check for "{Name} Cup"
+    const segments = title.split(/\s*(?:,\s*|\band\b)\s*/);
+    for (const segment of segments) {
+      const match = segment.match(/^(.*?)\s+Cup\b/i);
+      if (!match) continue;
+      // Strip edition suffix: "Fantasy Cup: Great League Edition" → "Fantasy"
+      const rawName = match[1].replace(/:.*$/, "").trim();
+      if (STANDARD_LEAGUES.has(rawName.toLowerCase())) continue;
+      // Strip leading year/numbers: "2025 Championship Series" → "Championship Series"
+      const cleanName = rawName.replace(/^\d+\s+/, "");
+      const id = cleanName.toLowerCase().replace(/\s+/g, "");
+      cups.set(id, `${cleanName} Cup`);
     }
   }
 
