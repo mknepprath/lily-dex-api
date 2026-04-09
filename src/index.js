@@ -32,7 +32,7 @@ async function build() {
   console.log("\nFetching PvP rankings...");
   let rankings;
   try {
-    rankings = await fetchPvpRankings(pvpoke.speciesIdToDex);
+    rankings = await fetchPvpRankings(pvpoke.speciesIdToDex, pvpoke.speciesIdToName);
     sourceStatus.rankings = rankings.status;
   } catch (err) {
     console.warn(`  Rankings fetch failed: ${err.message}`);
@@ -121,9 +121,42 @@ async function build() {
   console.log("\nFetching cup rankings...");
   let cupRankings = [];
   try {
-    cupRankings = await fetchCupRankings(eventsResult.events, pvpoke.speciesIdToDex);
+    cupRankings = await fetchCupRankings(eventsResult.events, pvpoke.speciesIdToDex, pvpoke.speciesIdToName);
   } catch (err) {
     console.warn(`  Cup rankings fetch failed: ${err.message}`);
+  }
+
+  // Enrich GBL events with top Pokemon sprites from cup rankings
+  if (cupRankings.length > 0) {
+    const cupById = new Map(cupRankings.map((c) => [c.id, c]));
+    const cupPattern = /\band\s+(\w[\w\s]*?)\s+Cup\b/gi;
+    let enriched = 0;
+    for (const event of eventsResult.events) {
+      if (event.tag !== "GBL" || (event.pokemonDexNrs && event.pokemonDexNrs.length > 0)) continue;
+      let match;
+      cupPattern.lastIndex = 0;
+      while ((match = cupPattern.exec(event.title)) !== null) {
+        const cupId = match[1].trim().toLowerCase().replace(/\s+/g, "");
+        const cup = cupById.get(cupId);
+        if (cup) {
+          const seen = new Set();
+          const topDex = [];
+          for (const r of cup.rankings) {
+            if (r.dexNr && !seen.has(r.dexNr)) {
+              seen.add(r.dexNr);
+              topDex.push(r.dexNr);
+              if (topDex.length >= 5) break;
+            }
+          }
+          if (topDex.length > 0) {
+            event.pokemonDexNrs = topDex;
+            enriched++;
+            break;
+          }
+        }
+      }
+    }
+    if (enriched > 0) console.log(`  ${enriched} GBL event(s) enriched with cup top Pokemon`);
   }
 
   // Write outputs

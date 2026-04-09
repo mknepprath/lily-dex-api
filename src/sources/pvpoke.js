@@ -18,6 +18,7 @@ export async function fetchPvpoke() {
   const thirdMoveCostByDex = new Map();
   const defaultIVsByDex = new Map();
   const speciesIdToDex = new Map();
+  const speciesIdToName = new Map();
   const movesBySpeciesId = new Map();
 
   if (!Array.isArray(data)) {
@@ -30,6 +31,7 @@ export async function fetchPvpoke() {
     if (entry.released) releasedDex.add(entry.dex);
 
     speciesIdToDex.set(entry.speciesId, entry.dex);
+    if (entry.speciesName) speciesIdToName.set(entry.speciesId, entry.speciesName);
 
     if (entry.tags && !tagsByDex.has(entry.dex)) {
       tagsByDex.set(entry.dex, entry.tags);
@@ -52,10 +54,17 @@ export async function fetchPvpoke() {
     }
 
     // Store move lists by speciesId (includes legacy/signature moves)
+    // PvPoke has `eliteMoves` (covers both fast and charged) and `eliteChargedMoves` (charged only).
+    // Derive elite fast moves: any move in eliteMoves that's also in fastMoves.
+    const eliteMoveSet = new Set(entry.eliteMoves || []);
+    const eliteFastMoves = (entry.fastMoves || [])
+      .filter((m) => eliteMoveSet.has(m))
+      .map((m) => m + "_FAST");
     movesBySpeciesId.set(entry.speciesId, {
       fastMoves: (entry.fastMoves || []).map((m) => m + "_FAST"),
       chargedMoves: entry.chargedMoves || [],
       eliteChargedMoves: entry.eliteChargedMoves || [],
+      eliteFastMoves,
     });
   }
 
@@ -67,6 +76,7 @@ export async function fetchPvpoke() {
     thirdMoveCostByDex,
     defaultIVsByDex,
     speciesIdToDex,
+    speciesIdToName,
     movesBySpeciesId,
     status,
     error,
@@ -113,8 +123,10 @@ function findReturnPokemon(leagueDataArrays, speciesIdToDex) {
   return [...returnDexNrs];
 }
 
-const mapRankings = (data, speciesIdToDex) =>
-  (Array.isArray(data) ? data : []).slice(0, 100).map((entry, index) => ({
+const mapRankings = (data, speciesIdToDex, speciesIdToName) => {
+  const resolveName = (id) => speciesIdToName?.get(id) || id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  return (Array.isArray(data) ? data : []).slice(0, 100).map((entry, index) => ({
     rank: index + 1,
     speciesId: entry.speciesId,
     speciesName: entry.speciesName,
@@ -125,11 +137,20 @@ const mapRankings = (data, speciesIdToDex) =>
     rating: entry.rating,
     moveset: entry.moveset,
     movesetNames: (entry.moveset || []).map(moveIdToName),
-    matchups: (entry.matchups || []).slice(0, 5),
-    counters: (entry.counters || []).slice(0, 5),
+    matchups: (entry.matchups || []).slice(0, 5).map((m) => ({
+      opponent: resolveName(m.opponent),
+      dexNr: speciesIdToDex.get(m.opponent) || speciesIdToDex.get(m.opponent.replace(/_shadow$/, "")) || null,
+      rating: m.rating,
+    })),
+    counters: (entry.counters || []).slice(0, 5).map((m) => ({
+      opponent: resolveName(m.opponent),
+      dexNr: speciesIdToDex.get(m.opponent) || speciesIdToDex.get(m.opponent.replace(/_shadow$/, "")) || null,
+      rating: m.rating,
+    })),
   }));
+};
 
-export async function fetchPvpRankings(speciesIdToDex) {
+export async function fetchPvpRankings(speciesIdToDex, speciesIdToName) {
   const RANKINGS_BASE = `${BASE}/rankings/all/overall`;
 
   const [little, great, ultra, master] = await Promise.all([
@@ -146,10 +167,10 @@ export async function fetchPvpRankings(speciesIdToDex) {
   );
 
   return {
-    little: mapRankings(little.data, speciesIdToDex),
-    great: mapRankings(great.data, speciesIdToDex),
-    ultra: mapRankings(ultra.data, speciesIdToDex),
-    master: mapRankings(master.data, speciesIdToDex),
+    little: mapRankings(little.data, speciesIdToDex, speciesIdToName),
+    great: mapRankings(great.data, speciesIdToDex, speciesIdToName),
+    ultra: mapRankings(ultra.data, speciesIdToDex, speciesIdToName),
+    master: mapRankings(master.data, speciesIdToDex, speciesIdToName),
     returnPokemon,
     status: { little: little.status, great: great.status, ultra: ultra.status, master: master.status },
   };
@@ -183,7 +204,7 @@ function parseCupsFromEvents(events) {
  * Fetch rankings for active specialty cups from PvPoke.
  * Silently skips cups with no data available.
  */
-export async function fetchCupRankings(events, speciesIdToDex) {
+export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) {
   const cups = parseCupsFromEvents(events);
   if (cups.length === 0) return [];
 
@@ -196,10 +217,22 @@ export async function fetchCupRankings(events, speciesIdToDex) {
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const rankings = mapRankings(data, speciesIdToDex);
+      const rankings = mapRankings(data, speciesIdToDex, speciesIdToName);
       if (rankings.length > 0) {
-        results.push({ id: cup.id, name: cup.name, cp: 1500, rankings });
-        console.log(`  ${cup.name}: ${rankings.length} rankings`);
+        // Get the actual last commit date for this file from GitHub API
+        let lastUpdated = null;
+        try {
+          const commitUrl = `https://api.github.com/repos/pvpoke/pvpoke/commits?path=src/data/rankings/${cup.id}/overall/rankings-1500.json&per_page=1`;
+          const commitRes = await fetch(commitUrl, { signal: AbortSignal.timeout(10000) });
+          if (commitRes.ok) {
+            const commits = await commitRes.json();
+            if (commits.length > 0) {
+              lastUpdated = commits[0].commit.committer.date;
+            }
+          }
+        } catch { /* non-fatal */ }
+        results.push({ id: cup.id, name: cup.name, cp: 1500, lastUpdated, rankings });
+        console.log(`  ${cup.name}: ${rankings.length} rankings (updated ${lastUpdated || "unknown"})`);
       }
     } catch (err) {
       console.warn(`  ${cup.name}: no data available (${err.message})`);

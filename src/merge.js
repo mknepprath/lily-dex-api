@@ -222,6 +222,18 @@ function supplementMovesFromPvPoke(gm, pvpoke, gameMaster) {
         }
       }
     }
+    // Also add elite fast moves
+    for (const moveId of pvpMoves?.eliteFastMoves || []) {
+      if (!gm.eliteQuickMoves?.[moveId] && !gm.quickMoves[moveId]) {
+        const info = buildMoveInfo(moveId, movesMap, combatMovesMap);
+        if (info) {
+          if (!gm.eliteQuickMoves || Array.isArray(gm.eliteQuickMoves)) {
+            gm.eliteQuickMoves = {};
+          }
+          gm.eliteQuickMoves[moveId] = info;
+        }
+      }
+    }
   }
 
   // Supplement regional form moves too
