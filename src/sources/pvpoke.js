@@ -137,12 +137,12 @@ const mapRankings = (data, speciesIdToDex, speciesIdToName) => {
     rating: entry.rating,
     moveset: entry.moveset,
     movesetNames: (entry.moveset || []).map(moveIdToName),
-    matchups: (entry.matchups || []).slice(0, 5).map((m) => ({
+    matchups: (entry.matchups || []).slice(0, 10).map((m) => ({
       opponent: resolveName(m.opponent),
       dexNr: speciesIdToDex.get(m.opponent) || speciesIdToDex.get(m.opponent.replace(/_shadow$/, "")) || null,
       rating: m.rating,
     })),
-    counters: (entry.counters || []).slice(0, 5).map((m) => ({
+    counters: (entry.counters || []).slice(0, 10).map((m) => ({
       opponent: resolveName(m.opponent),
       dexNr: speciesIdToDex.get(m.opponent) || speciesIdToDex.get(m.opponent.replace(/_shadow$/, "")) || null,
       rating: m.rating,
