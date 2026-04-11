@@ -141,15 +141,18 @@ async function build() {
         if (cup) {
           const seen = new Set();
           const topDex = [];
+          const topSpeciesIds = [];
           for (const r of cup.rankings) {
             if (r.dexNr && !seen.has(r.dexNr)) {
               seen.add(r.dexNr);
               topDex.push(r.dexNr);
+              topSpeciesIds.push(r.speciesId);
               if (topDex.length >= 5) break;
             }
           }
           if (topDex.length > 0) {
             event.pokemonDexNrs = topDex;
+            event.pokemonSpeciesIds = topSpeciesIds;
             enriched++;
             break;
           }
