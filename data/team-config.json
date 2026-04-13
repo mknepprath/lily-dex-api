@@ -1,0 +1,12 @@
+{
+  "typeDiversityBonus": 8.0,
+  "matchupSynergyBonus": 15.0,
+  "sharedCounterPenalty": 20.0,
+  "standardTeamCount": 3,
+  "budgetMaxThirdMoveCost": 50000,
+  "budgetMaxBuddyDistance": 5,
+  "antiMetaPoolSize": 10,
+  "antiMetaHitWeight": 100.0,
+  "antiMetaRatingWeight": 0.1,
+  "beatsTopMetaPoolSize": 20
+}

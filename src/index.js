@@ -132,7 +132,7 @@ async function build() {
     const cupPattern = /\band\s+(\w[\w\s]*?)\s+Cup\b/gi;
     let enriched = 0;
     for (const event of eventsResult.events) {
-      if (event.tag !== "GBL" || (event.pokemonDexNrs && event.pokemonDexNrs.length > 0)) continue;
+      if (event.tag !== "GBL" || (event.pokemonSpeciesIds && event.pokemonSpeciesIds.length > 0)) continue;
       let match;
       cupPattern.lastIndex = 0;
       while ((match = cupPattern.exec(event.title)) !== null) {
@@ -195,6 +195,17 @@ async function build() {
   );
   console.log(`  events.json (${eventsResult.events.length} events)`);
 
+  // Load team config
+  let teamConfig = null;
+  const teamConfigPath = new URL("../data/team-config.json", import.meta.url).pathname;
+  if (existsSync(teamConfigPath)) {
+    try {
+      teamConfig = JSON.parse(readFileSync(teamConfigPath, "utf-8"));
+    } catch (err) {
+      console.warn(`  Team config failed: ${err.message}`);
+    }
+  }
+
   writeFileSync(
     `${OUTPUT_DIR}rankings.json`,
     JSON.stringify({
@@ -203,6 +214,7 @@ async function build() {
       master: rankings.master || [],
       returnPokemon: rankings.returnPokemon || [],
       cups: cupRankings,
+      ...(teamConfig ? { teamConfig } : {}),
     })
   );
   console.log(`  rankings.json (${(rankings.returnPokemon || []).length} Return Pokemon, ${cupRankings.length} cup(s))`);
