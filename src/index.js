@@ -212,6 +212,7 @@ async function build() {
       great: rankings.great || [],
       ultra: rankings.ultra || [],
       master: rankings.master || [],
+      roles: rankings.roles || null,
       returnPokemon: rankings.returnPokemon || [],
       cups: cupRankings,
       ...(teamConfig ? { teamConfig } : {}),

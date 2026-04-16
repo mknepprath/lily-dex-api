@@ -150,14 +150,35 @@ const mapRankings = (data, speciesIdToDex, speciesIdToName) => {
   }));
 };
 
+/**
+ * Fetch role-specific rankings (leads/switches/closers) for a league.
+ * Returns null fields for any role that fails to load — non-fatal.
+ */
+async function fetchLeagueRoles(cp, speciesIdToDex, speciesIdToName) {
+  const roleBase = (role) => `${BASE}/rankings/all/${role}/rankings-${cp}.json`;
+  const [leads, switches, closers] = await Promise.all([
+    fetchWithCache(`rankings-${cp}-leads`, roleBase("leads")).catch(() => ({ data: null })),
+    fetchWithCache(`rankings-${cp}-switches`, roleBase("switches")).catch(() => ({ data: null })),
+    fetchWithCache(`rankings-${cp}-closers`, roleBase("closers")).catch(() => ({ data: null })),
+  ]);
+  return {
+    leads: leads.data ? mapRankings(leads.data, speciesIdToDex, speciesIdToName) : null,
+    switches: switches.data ? mapRankings(switches.data, speciesIdToDex, speciesIdToName) : null,
+    closers: closers.data ? mapRankings(closers.data, speciesIdToDex, speciesIdToName) : null,
+  };
+}
+
 export async function fetchPvpRankings(speciesIdToDex, speciesIdToName) {
   const RANKINGS_BASE = `${BASE}/rankings/all/overall`;
 
-  const [little, great, ultra, master] = await Promise.all([
+  const [little, great, ultra, master, greatRoles, ultraRoles, masterRoles] = await Promise.all([
     fetchWithCache("rankings-500", `${RANKINGS_BASE}/rankings-500.json`),
     fetchWithCache("rankings-1500", `${RANKINGS_BASE}/rankings-1500.json`),
     fetchWithCache("rankings-2500", `${RANKINGS_BASE}/rankings-2500.json`),
     fetchWithCache("rankings-10000", `${RANKINGS_BASE}/rankings-10000.json`),
+    fetchLeagueRoles(1500, speciesIdToDex, speciesIdToName),
+    fetchLeagueRoles(2500, speciesIdToDex, speciesIdToName),
+    fetchLeagueRoles(10000, speciesIdToDex, speciesIdToName),
   ]);
 
   // Find Pokemon where purified (with Return) outranks shadow in any league
@@ -171,6 +192,11 @@ export async function fetchPvpRankings(speciesIdToDex, speciesIdToName) {
     great: mapRankings(great.data, speciesIdToDex, speciesIdToName),
     ultra: mapRankings(ultra.data, speciesIdToDex, speciesIdToName),
     master: mapRankings(master.data, speciesIdToDex, speciesIdToName),
+    roles: {
+      great: greatRoles,
+      ultra: ultraRoles,
+      master: masterRoles,
+    },
     returnPokemon,
     status: { little: little.status, great: great.status, ultra: ultra.status, master: master.status },
   };
@@ -221,6 +247,20 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
 
   console.log(`  Found ${cups.length} specialty cup(s): ${cups.map((c) => c.name).join(", ")}`);
 
+  // Helper to fetch + map a single role file for a cup; returns null on miss
+  async function fetchCupRole(cupId, role) {
+    const url = `${BASE}/rankings/${cupId}/${role}/rankings-1500.json`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const mapped = mapRankings(data, speciesIdToDex, speciesIdToName);
+      return mapped.length > 0 ? mapped : null;
+    } catch {
+      return null;
+    }
+  }
+
   const results = [];
   for (const cup of cups) {
     const url = `${BASE}/rankings/${cup.id}/overall/rankings-1500.json`;
@@ -230,6 +270,13 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
       const data = await res.json();
       const rankings = mapRankings(data, speciesIdToDex, speciesIdToName);
       if (rankings.length > 0) {
+        // Fetch role-specific rankings in parallel — non-fatal if missing
+        const [leads, switches, closers] = await Promise.all([
+          fetchCupRole(cup.id, "leads"),
+          fetchCupRole(cup.id, "switches"),
+          fetchCupRole(cup.id, "closers"),
+        ]);
+
         // Get the actual last commit date for this file from GitHub API
         let lastUpdated = null;
         try {
@@ -242,8 +289,9 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
             }
           }
         } catch { /* non-fatal */ }
-        results.push({ id: cup.id, name: cup.name, cp: 1500, lastUpdated, rankings });
-        console.log(`  ${cup.name}: ${rankings.length} rankings (updated ${lastUpdated || "unknown"})`);
+        results.push({ id: cup.id, name: cup.name, cp: 1500, lastUpdated, rankings, leads, switches, closers });
+        const roleNote = [leads && "leads", switches && "switches", closers && "closers"].filter(Boolean).join("/");
+        console.log(`  ${cup.name}: ${rankings.length} rankings${roleNote ? ` + ${roleNote}` : ""} (updated ${lastUpdated || "unknown"})`);
       }
     } catch (err) {
       console.warn(`  ${cup.name}: no data available (${err.message})`);

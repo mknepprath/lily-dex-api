@@ -8,5 +8,7 @@
   "antiMetaPoolSize": 10,
   "antiMetaHitWeight": 100.0,
   "antiMetaRatingWeight": 0.1,
-  "beatsTopMetaPoolSize": 20
+  "beatsTopMetaPoolSize": 20,
+  "abbMinRank": 80,
+  "spiceExcludeTop": 30
 }
