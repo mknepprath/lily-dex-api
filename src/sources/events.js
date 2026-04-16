@@ -283,7 +283,12 @@ async function enrichFromLeekDuck(events) {
     await Promise.allSettled(
       batch.map(async (event) => {
         try {
-          const res = await fetch(event.url, { signal: AbortSignal.timeout(10000) });
+          const res = await fetch(event.url, {
+            signal: AbortSignal.timeout(10000),
+            headers: {
+              "User-Agent": "lily-dex-api/1.0 (+https://github.com/mknepprath/lily-dex-api)",
+            },
+          });
           if (!res.ok) return;
           const html = await res.text();
           const scraped = extractDexNrsFromHTML(html);
