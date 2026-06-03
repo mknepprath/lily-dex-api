@@ -23,7 +23,7 @@ export async function fetchPvpoke() {
 
   if (!Array.isArray(data)) {
     console.error("  PvPoke data is not an array, skipping parse");
-    return { releasedDex, tagsByDex, buddyByDex, familyByDex, thirdMoveCostByDex, defaultIVsByDex, speciesIdToDex, status: "error", error: "Invalid data format" };
+    return { releasedDex, tagsByDex, buddyByDex, familyByDex, thirdMoveCostByDex, defaultIVsByDex, speciesIdToDex, speciesIdToName, movesBySpeciesId, status: "error", error: "Invalid data format" };
   }
 
   for (const entry of data) {

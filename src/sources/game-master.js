@@ -1,7 +1,36 @@
 import { fetchWithCache, TYPE_NAMES, ITEM_NAMES, getGeneration, idToName, moveIdToName } from "../utils.js";
 
-const URL =
+const GAME_MASTER_URL =
   "https://raw.githubusercontent.com/PokeMiners/game_masters/master/latest/latest.json";
+
+export function buildEvolutionItem(itemId) {
+  if (!itemId) return null;
+  return { id: itemId, names: { English: ITEM_NAMES[itemId] || idToName(itemId) } };
+}
+
+export function buildEvolutionEntry(evo, pokemonMap, questTemplateMap = null) {
+  return {
+    id: String(evo.evolution || ""),
+    formId: String(evo.form || `${evo.evolution}_NORMAL`),
+    dexNr: pokemonMap.get(evo.evolution)?.dexNr || pokemonMap.get(`${evo.evolution}_NORMAL`)?.dexNr || null,
+    candies: evo.candyCost || 0,
+    item: buildEvolutionItem(evo.evolutionItemRequirement),
+    quests: questTemplateMap && evo.questDisplay?.length > 0
+      ? evo.questDisplay.map((qd) => {
+          const questId = qd.questRequirementTemplateId || "";
+          const displayName = questTemplateMap.get(questId) || "";
+          return { id: questId, type: null, names: { English: displayName } };
+        }).filter((q) => q.names.English && !(evo.kmBuddyDistanceRequirement && q.names.English.startsWith("Walk")))
+      : null,
+    buddyDistance: evo.kmBuddyDistanceRequirement || null,
+    mustBeBuddy: evo.mustBeBuddy || false,
+    onlyDaytime: evo.onlyDaytime || false,
+    onlyNighttime: evo.onlyNighttime || false,
+    genderRequirement: evo.genderRequirement || null,
+    lureItem: buildEvolutionItem(evo.lureItemRequirement),
+    tradeEvolution: evo.noCandyCostViaTrade || false,
+  };
+}
 
 function buildTypeInfo(typeEnum) {
   if (!typeEnum) return null;
@@ -44,7 +73,7 @@ export function buildMoveInfo(moveId, movesMap, combatMovesMap) {
 }
 
 export async function fetchGameMaster() {
-  const { data, status, error } = await fetchWithCache("game-master", URL);
+  const { data, status, error } = await fetchWithCache("game-master", GAME_MASTER_URL);
 
   if (!Array.isArray(data)) {
     console.error("  Game Master data is not an array, skipping parse");
@@ -180,31 +209,9 @@ export async function fetchGameMaster() {
     }
 
     // Build evolution data
-    const evolutions = (base.evolutionBranch || []).map((evo) => ({
-      id: String(evo.evolution || ""),
-      formId: String(evo.form || `${evo.evolution}_NORMAL`),
-      dexNr: pokemonMap.get(evo.evolution)?.dexNr || pokemonMap.get(`${evo.evolution}_NORMAL`)?.dexNr || null,
-      candies: evo.candyCost || 0,
-      item: evo.evolutionItemRequirement
-        ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }
-        : null,
-      quests: evo.questDisplay?.length > 0
-        ? evo.questDisplay.map((qd) => {
-            const questId = qd.questRequirementTemplateId || "";
-            const displayName = questTemplateMap.get(questId) || "";
-            return { id: questId, type: null, names: { English: displayName } };
-          }).filter((q) => q.names.English && !(evo.kmBuddyDistanceRequirement && q.names.English.startsWith("Walk")))
-        : null,
-      buddyDistance: evo.kmBuddyDistanceRequirement || null,
-      mustBeBuddy: evo.mustBeBuddy || false,
-      onlyDaytime: evo.onlyDaytime || false,
-      onlyNighttime: evo.onlyNighttime || false,
-      genderRequirement: evo.genderRequirement || null,
-      lureItem: evo.lureItemRequirement
-        ? { id: evo.lureItemRequirement, names: { English: ITEM_NAMES[evo.lureItemRequirement] || idToName(evo.lureItemRequirement) } }
-        : null,
-      tradeEvolution: evo.noCandyCostViaTrade || false,
-    }));
+    const evolutions = (base.evolutionBranch || []).map((evo) =>
+      buildEvolutionEntry(evo, pokemonMap, questTemplateMap)
+    );
 
     // Build regional/alternate forms — any entry that differs from the base
     // (different stats or types) and isn't a costume variant
@@ -253,27 +260,9 @@ export async function fetchGameMaster() {
           cinematicMoves: regionCinematicMoves,
           eliteQuickMoves: [],
           eliteCinematicMoves: [],
-          evolutions: (regionEntry.evolutionBranch || []).map((evo) => ({
-            id: String(evo.evolution || ""),
-            formId: String(evo.form || `${evo.evolution}_NORMAL`),
-            dexNr: pokemonMap.get(evo.evolution)?.dexNr || pokemonMap.get(`${evo.evolution}_NORMAL`)?.dexNr || null,
-            candies: evo.candyCost || 0,
-            item: evo.evolutionItemRequirement
-              ? { id: evo.evolutionItemRequirement, names: { English: ITEM_NAMES[evo.evolutionItemRequirement] || idToName(evo.evolutionItemRequirement) } }
-              : null,
-            quests: evo.questDisplay
-              ? [{ id: evo.questDisplay.questRequirementTemplateId || "", type: null, names: { English: evo.questDisplay.questRequirementTemplateId || "" } }]
-              : null,
-            buddyDistance: evo.kmBuddyDistanceRequirement || null,
-            mustBeBuddy: evo.mustBeBuddy || false,
-            onlyDaytime: evo.onlyDaytime || false,
-            onlyNighttime: evo.onlyNighttime || false,
-            genderRequirement: evo.genderRequirement || null,
-            lureItem: evo.lureItemRequirement
-              ? { id: evo.lureItemRequirement, names: { English: ITEM_NAMES[evo.lureItemRequirement] || idToName(evo.lureItemRequirement) } }
-              : null,
-            tradeEvolution: evo.noCandyCostViaTrade || false,
-          })),
+          evolutions: (regionEntry.evolutionBranch || []).map((evo) =>
+            buildEvolutionEntry(evo, pokemonMap)
+          ),
           hasMegaEvolution: false,
           megaEvolutions: [],
           hasGigantamaxEvolution: false,

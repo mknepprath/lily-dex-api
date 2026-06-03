@@ -38,7 +38,7 @@ describe("mergePokemon", () => {
     expect(result).toEqual([]);
   });
 
-  it("skips unreleased pokemon", () => {
+  it("sets released: false for pokemon not in releasedDex", () => {
     const gm = makeGameMaster([{
       pokemonId: "BULBASAUR",
       dexNr: 1,
@@ -47,7 +47,8 @@ describe("mergePokemon", () => {
     }]);
     const pvpoke = makePvpoke({ releasedDex: new Set() }); // none released
     const result = mergePokemon(gm, pvpoke, makePokemonGoApi());
-    expect(result).toEqual([]);
+    expect(result).toHaveLength(1);
+    expect(result[0].released).toBe(false);
   });
 
   it("merges a basic pokemon entry", () => {
