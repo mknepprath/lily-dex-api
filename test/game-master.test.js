@@ -140,6 +140,19 @@ describe("buildEvolutionEntry", () => {
     expect(result.quests).toBeNull();
   });
 
+  it("regional form quests work when questTemplateMap passed", () => {
+    // Matches real data: Galarian Slowpoke → Galarian Slowbro requires a quest
+    const questTemplateMap = new Map([["SLOWBRO_G_EVOLUTION_QUEST", "Catch 30 Psychic-type Pokémon"]]);
+    const evo = {
+      evolution: "SLOWBRO",
+      candyCost: 50,
+      questDisplay: [{ questRequirementTemplateId: "SLOWBRO_G_EVOLUTION_QUEST" }],
+    };
+    const result = buildEvolutionEntry(evo, new Map(), questTemplateMap);
+    expect(result.quests).toHaveLength(1);
+    expect(result.quests[0].names.English).toBe("Catch 30 Psychic-type Pokémon");
+  });
+
   it("handles daytime/nighttime/buddy restrictions", () => {
     const evo = { evolution: "ESPEON", onlyDaytime: true, mustBeBuddy: true };
     const result = buildEvolutionEntry(evo, new Map());

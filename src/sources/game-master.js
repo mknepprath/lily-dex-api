@@ -261,7 +261,7 @@ export async function fetchGameMaster() {
           eliteQuickMoves: [],
           eliteCinematicMoves: [],
           evolutions: (regionEntry.evolutionBranch || []).map((evo) =>
-            buildEvolutionEntry(evo, pokemonMap)
+            buildEvolutionEntry(evo, pokemonMap, questTemplateMap)
           ),
           hasMegaEvolution: false,
           megaEvolutions: [],
