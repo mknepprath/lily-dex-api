@@ -1,6 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { calculateDefaultIVs } from "../src/iv-calc.js";
 
+describe("rank1IVs array format", () => {
+  it("returns [level, ivAtk, ivDef, ivSta] — not [ivAtk, ivDef, ivSta, level]", () => {
+    // Mewtwo (300/182/214) GL rank-1 is well-known: around L15, low IVs to fit 1500 CP
+    const result = calculateDefaultIVs({ baseAttack: 300, baseDefense: 182, baseStamina: 214 });
+    const cp1500 = result.cp1500;
+    expect(cp1500).not.toBeNull();
+    const [level, ivAtk, ivDef, ivSta] = cp1500;
+    // Level is first and should be <20 for a high-stat Pokemon to fit under 1500 CP
+    expect(level).toBeLessThan(20);
+    // IVs are 0-15
+    expect(ivAtk).toBeGreaterThanOrEqual(0); expect(ivAtk).toBeLessThanOrEqual(15);
+    expect(ivDef).toBeGreaterThanOrEqual(0); expect(ivDef).toBeLessThanOrEqual(15);
+    expect(ivSta).toBeGreaterThanOrEqual(0); expect(ivSta).toBeLessThanOrEqual(15);
+  });
+});
+
 describe("calculateDefaultIVs", () => {
   it("returns null for missing/zero stats", () => {
     expect(calculateDefaultIVs(null)).toBeNull();
