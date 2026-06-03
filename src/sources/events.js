@@ -163,7 +163,7 @@ function extractPokemonFromExtraData(entry, pokemonNames) {
  * Extract dex number from a Leek Duck image URL.
  * Handles: pokemon_icon_XXX_YY.png and pmXXX.icon.png / pmXXX.cCOSTUME.icon.png
  */
-function extractDexFromImage(url) {
+export function extractDexFromImage(url) {
   if (!url) return null;
   const standard = url.match(/pokemon_icon_(\d{3,4})_\d+/);
   if (standard) return parseInt(standard[1], 10);
@@ -172,7 +172,7 @@ function extractDexFromImage(url) {
   return null;
 }
 
-function matchNameToDex(name, pokemonNames) {
+export function matchNameToDex(name, pokemonNames) {
   // Strip prefixes like "Mega ", "Shadow ", "Gigantamax ", "Dynamax "
   const cleaned = name
     .replace(/^(Mega|Shadow|Gigantamax|Dynamax)\s+/i, "")
@@ -196,7 +196,7 @@ function matchNameToDex(name, pokemonNames) {
  * "2026-03-14T14:00:00+00:00" → "2026-03-14T14:00:00"
  * "2026-03-14" → "2026-03-14"
  */
-function parseISOToNaive(iso) {
+export function parseISOToNaive(iso) {
   if (!iso) return null;
   // Strip timezone offset and milliseconds
   return iso
@@ -361,7 +361,7 @@ function extractFields(block) {
   return fields;
 }
 
-function parseTag(summary) {
+export function parseTag(summary) {
   const tagMatch = summary.match(/^\[([A-Z]+)\]\s*/);
   if (!tagMatch) return { tag: "", title: summary };
   const tag = tagMatch[1];
@@ -369,7 +369,7 @@ function parseTag(summary) {
   return { tag, title };
 }
 
-function parseICSDate(raw) {
+export function parseICSDate(raw) {
   if (!raw) return { dateStr: null, isAllDay: false };
   const clean = raw.trim();
 
@@ -393,7 +393,7 @@ function parseICSDate(raw) {
   return { dateStr: null, isAllDay: false };
 }
 
-function unescapeICS(str) {
+export function unescapeICS(str) {
   return str
     .replace(/\\n/g, "\n")
     .replace(/\\,/g, ",")
@@ -429,7 +429,7 @@ function matchPokemon(title, tag, pokemonNames) {
   return [...new Set(matched)];
 }
 
-function extractCandidateNames(title, tag) {
+export function extractCandidateNames(title, tag) {
   switch (tag) {
     case "CD": {
       const m = title.match(/^(.+?)\s+Community Day/i);
@@ -471,6 +471,6 @@ function extractCandidateNames(title, tag) {
   }
 }
 
-function escapeRegex(str) {
+export function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

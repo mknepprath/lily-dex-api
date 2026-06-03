@@ -211,7 +211,7 @@ export async function fetchPvpRankings(speciesIdToDex, speciesIdToName) {
  */
 const STANDARD_LEAGUES = new Set(["great league", "ultra league", "master league"]);
 
-function parseCupsFromEvents(events) {
+export function parseCupsFromEvents(events) {
   const cups = new Map(); // id → display name
 
   for (const event of events) {
