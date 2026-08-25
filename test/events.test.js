@@ -4,6 +4,7 @@ import {
   parseTag,
   parseICSDate,
   unescapeICS,
+  decodeHTMLEntities,
   extractDexFromImage,
   matchNameToDex,
   extractCandidateNames,
@@ -91,6 +92,35 @@ describe("parseICSDate", () => {
     const result = parseICSDate("20260314T140000Z");
     expect(result.dateStr).toBe("2026-03-14T14:00:00");
     expect(result.isAllDay).toBe(false);
+  });
+});
+
+// ─── decodeHTMLEntities ──────────────────────────────────────────────────────
+
+describe("decodeHTMLEntities", () => {
+  it("decodes &amp; to & (the reported bug)", () => {
+    expect(decodeHTMLEntities("PokémonXP &amp; 2026 Worlds")).toBe("PokémonXP & 2026 Worlds");
+  });
+
+  it("decodes named entities", () => {
+    expect(decodeHTMLEntities("a &lt;b&gt; &quot;c&quot; &apos;d&apos;")).toBe('a <b> "c" \'d\'');
+  });
+
+  it("decodes numeric and hex entities", () => {
+    expect(decodeHTMLEntities("Trainer&#39;s &#x2764; day")).toBe("Trainer's ❤ day");
+  });
+
+  it("does not double-decode &amp;lt;", () => {
+    expect(decodeHTMLEntities("&amp;lt;")).toBe("&lt;");
+  });
+
+  it("leaves plain strings untouched", () => {
+    expect(decodeHTMLEntities("Community Day")).toBe("Community Day");
+  });
+
+  it("handles non-string input", () => {
+    expect(decodeHTMLEntities("")).toBe("");
+    expect(decodeHTMLEntities(undefined)).toBe(undefined);
   });
 });
 

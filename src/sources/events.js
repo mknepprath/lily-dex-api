@@ -85,7 +85,7 @@ function parseScrapedDuckEvent(entry, pokemonNames) {
   if (/example|template|demo|test/i.test(entry.name)) return null;
 
   const tag = TYPE_TO_TAG[entry.eventType] || "E";
-  const title = entry.name;
+  const title = decodeHTMLEntities(entry.name);
   const summary = tag ? `[${tag}] ${title}` : title;
 
   // Parse dates — convert ISO to naive local strings
@@ -107,7 +107,7 @@ function parseScrapedDuckEvent(entry, pokemonNames) {
     summary,
     tag,
     title,
-    description: entry.heading || "",
+    description: decodeHTMLEntities(entry.heading || ""),
     startDate,
     endDate,
     isAllDay,
@@ -225,7 +225,7 @@ function parseICS(icsText, pokemonNames) {
 
     if (!fields.UID || !fields.SUMMARY) continue;
 
-    const summary = unescapeICS(fields.SUMMARY);
+    const summary = decodeHTMLEntities(unescapeICS(fields.SUMMARY));
     if (/example|template|demo|test/i.test(summary)) continue;
     const { tag, title } = parseTag(summary);
 
@@ -237,7 +237,7 @@ function parseICS(icsText, pokemonNames) {
     );
     if (!startDate || !endDate) continue;
 
-    const description = unescapeICS(fields.DESCRIPTION || "");
+    const description = decodeHTMLEntities(unescapeICS(fields.DESCRIPTION || ""));
     const url = fields.URL || null;
 
     let imageURL = null;
@@ -399,6 +399,22 @@ export function unescapeICS(str) {
     .replace(/\\,/g, ",")
     .replace(/\\;/g, ";")
     .replace(/\\\\/g, "\\");
+}
+
+// Decode HTML entities that leak through from scraped sources (e.g. ScrapedDuck
+// titles like "PokémonXP &amp; 2026 Worlds"). Handles named and numeric
+// entities; &amp; is decoded last so we don't double-decode "&amp;lt;".
+export function decodeHTMLEntities(str) {
+  if (typeof str !== "string" || !str.includes("&")) return str;
+  return str
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 function matchPokemon(title, tag, pokemonNames) {
