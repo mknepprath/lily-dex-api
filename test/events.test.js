@@ -5,6 +5,8 @@ import {
   parseICSDate,
   unescapeICS,
   decodeHTMLEntities,
+  parsePokemonIcon,
+  extractPokemonFromHTML,
   extractDexFromImage,
   matchNameToDex,
   extractCandidateNames,
@@ -145,6 +147,57 @@ describe("unescapeICS", () => {
 
   it("passes through unescaped text", () => {
     expect(unescapeICS("Hello World")).toBe("Hello World");
+  });
+});
+
+// ─── parsePokemonIcon ────────────────────────────────────────────────────────
+
+describe("parsePokemonIcon", () => {
+  it("reads a Galarian form from a numeric icon code (_31)", () => {
+    expect(parsePokemonIcon("x/pokemon_icon_052_31.png")).toEqual({ dexNr: 52, form: "galarian" });
+    expect(parsePokemonIcon("x/pokemon_icon_079_31.png")).toEqual({ dexNr: 79, form: "galarian" });
+  });
+
+  it("reads a form named directly in pm{dex}.f{FORM}", () => {
+    expect(parsePokemonIcon("x/pm215.fHISUIAN.icon.png")).toEqual({ dexNr: 215, form: "hisuian" });
+    expect(parsePokemonIcon("x/pm222.fGALARIAN.icon.png")).toEqual({ dexNr: 222, form: "galarian" });
+  });
+
+  it("treats base and costume icons as formless", () => {
+    expect(parsePokemonIcon("x/pokemon_icon_001_00.png")).toEqual({ dexNr: 1, form: null });
+    expect(parsePokemonIcon("x/pm25.cHAT.icon.png")).toEqual({ dexNr: 25, form: null });
+    expect(parsePokemonIcon("x/pm150.icon.png")).toEqual({ dexNr: 150, form: null });
+  });
+
+  it("returns null for non-icon input", () => {
+    expect(parsePokemonIcon("")).toBeNull();
+    expect(parsePokemonIcon("https://example.com/logo.png")).toBeNull();
+  });
+});
+
+// ─── extractPokemonFromHTML ──────────────────────────────────────────────────
+
+describe("extractPokemonFromHTML", () => {
+  it("keeps the regional form of each scraped Pokemon", () => {
+    const html = `
+      <img src="pokemon_icon_052_31.png">
+      <img src="pm222.fGALARIAN.icon.png">
+      <img src="pokemon_icon_025_00.png">`;
+    const { dexNrs, formByDex } = extractPokemonFromHTML(html);
+    expect(dexNrs).toEqual([25, 52, 222]);
+    expect(formByDex.get(52)).toBe("galarian");
+    expect(formByDex.get(222)).toBe("galarian");
+    expect(formByDex.has(25)).toBe(false);
+  });
+
+  it("drops Pokemon (and their forms) listed in excluded sections", () => {
+    const html = `
+      <img src="pokemon_icon_052_31.png">
+      <p>Pokémon not allowed:</p>
+      <ul class="pkmn-list-flex"><img src="pokemon_icon_052_31.png"></ul>`;
+    const { dexNrs, formByDex } = extractPokemonFromHTML(html);
+    expect(dexNrs).not.toContain(52);
+    expect(formByDex.has(52)).toBe(false);
   });
 });
 

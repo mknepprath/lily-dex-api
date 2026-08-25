@@ -291,10 +291,19 @@ async function enrichFromLeekDuck(events) {
           });
           if (!res.ok) return;
           const html = await res.text();
-          const scraped = extractDexNrsFromHTML(html);
+          const { dexNrs: scraped, formByDex } = extractPokemonFromHTML(html);
           if (scraped.length > 0) {
-            const merged = [...new Set([...event.pokemonDexNrs, ...scraped])];
-            event.pokemonDexNrs = merged.sort((a, b) => a - b);
+            const merged = [...new Set([...event.pokemonDexNrs, ...scraped])].sort(
+              (a, b) => a - b
+            );
+            event.pokemonDexNrs = merged;
+            // Emit species IDs aligned with pokemonDexNrs so the app can render
+            // regional forms (e.g. Galarian Meowth) instead of the base sprite.
+            if (formByDex.size > 0) {
+              event.pokemonSpeciesIds = merged.map((dex) =>
+                formByDex.has(dex) ? `${dex}_${formByDex.get(dex)}` : String(dex)
+              );
+            }
             enriched++;
           }
         } catch {
@@ -307,35 +316,60 @@ async function enrichFromLeekDuck(events) {
   console.log(`  ${enriched} events enriched with Pokemon from Leek Duck`);
 }
 
-function extractDexNrsFromHTML(html) {
+// Numeric Leek Duck icon form codes (pokemon_icon_{dex}_{code}). The
+// pm{dex}.f{FORM} format names its form directly and doesn't need this map.
+const ICON_FORM_CODES = {
+  "31": "galarian",
+  "61": "alola",
+};
+
+// Extract { dexNr, form } from a Leek Duck icon URL. `form` is a lowercase
+// suffix that matches the app's regional formId (e.g. "galarian" →
+// MEOWTH_GALARIAN), or null for base/costume icons.
+export function parsePokemonIcon(url) {
+  if (!url) return null;
+  let m = url.match(/pokemon_icon_(\d{3,4})_(\d+)/);
+  if (m) return { dexNr: parseInt(m[1], 10), form: ICON_FORM_CODES[m[2]] || null };
+  // pm{dex}.f{FORM}.icon.png — form named directly (fGALARIAN, fHISUIAN, …)
+  m = url.match(/pm(\d{1,4})\.f([A-Z0-9_]+)\.(?:s\.)?icon\.png/);
+  if (m) return { dexNr: parseInt(m[1], 10), form: m[2].toLowerCase() };
+  // pm{dex}.c{COSTUME}.icon.png or pm{dex}.icon.png — no regional form
+  m = url.match(/pm(\d{1,4})\.(?:c[A-Z0-9_]+\.)?(?:s\.)?icon\.png/);
+  if (m) return { dexNr: parseInt(m[1], 10), form: null };
+  return null;
+}
+
+// Scrape a Leek Duck event page for the Pokemon it features, keeping the
+// regional form of each (so the app renders the correct sprite).
+export function extractPokemonFromHTML(html) {
   const dexNrs = new Set();
+  const formByDex = new Map();
 
-  for (const m of html.matchAll(/pokemon_icon_(\d{3,4})_\d+/g)) {
-    const nr = parseInt(m[1], 10);
-    if (nr > 0 && nr < 2000) dexNrs.add(nr);
-  }
+  const add = (url) => {
+    const p = parsePokemonIcon(url);
+    if (!p || !(p.dexNr > 0 && p.dexNr < 2000)) return;
+    dexNrs.add(p.dexNr);
+    if (p.form && !formByDex.has(p.dexNr)) formByDex.set(p.dexNr, p.form);
+  };
 
-  for (const m of html.matchAll(/pm(\d{1,4})\.c[A-Z0-9_]+\.(?:s\.)?icon\.png/g)) {
-    const nr = parseInt(m[1], 10);
-    if (nr > 0 && nr < 2000) dexNrs.add(nr);
-  }
+  for (const m of html.matchAll(/pokemon_icon_\d{3,4}_\d+/g)) add(m[0]);
+  for (const m of html.matchAll(/pm\d{1,4}\.[fc][A-Z0-9_]+\.(?:s\.)?icon\.png/g)) add(m[0]);
 
   const excludeSections = html.matchAll(
     /(?:not (?:be )?(?:allowed|eligible)|cannot (?:be used|participate))[^]*?<ul[^>]*class="pkmn-list-flex"[^>]*>([\s\S]*?)<\/ul>/gi
   );
   for (const section of excludeSections) {
     const listHTML = section[1];
-    for (const m of listHTML.matchAll(/pokemon_icon_(\d{3,4})_\d+/g)) {
-      const nr = parseInt(m[1], 10);
-      if (nr > 0) dexNrs.delete(nr);
-    }
-    for (const m of listHTML.matchAll(/pm(\d{1,4})\.(?:c[A-Z0-9_]+\.)?(?:s\.)?icon\.png/g)) {
-      const nr = parseInt(m[1], 10);
-      if (nr > 0) dexNrs.delete(nr);
-    }
+    const drop = (nr) => {
+      dexNrs.delete(nr);
+      formByDex.delete(nr);
+    };
+    for (const m of listHTML.matchAll(/pokemon_icon_(\d{3,4})_\d+/g)) drop(parseInt(m[1], 10));
+    for (const m of listHTML.matchAll(/pm(\d{1,4})\.[fc][A-Z0-9_]+\.(?:s\.)?icon\.png/g))
+      drop(parseInt(m[1], 10));
   }
 
-  return [...dexNrs].sort((a, b) => a - b);
+  return { dexNrs: [...dexNrs].sort((a, b) => a - b), formByDex };
 }
 
 // ─── Shared Helpers ─────────────────────────────────────────
