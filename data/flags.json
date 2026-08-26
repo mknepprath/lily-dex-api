@@ -1,4 +1,4 @@
 {
-  "_comment": "Remote feature flags read by the app at launch. A flag set here overrides the app's built-in default, so a feature can be switched off without an App Store release. Users who explicitly set a flag in the app's debug menu keep their own setting.",
-  "collectionSetup": false
+  "_comment": "Remote feature flags read by the app at launch, published as meta.flags. Only add a flag here when you want to override the app's built-in default — most usefully as a kill switch, to turn a shipped feature off for everyone without an App Store release. A flag listed here applies to debug and TestFlight builds too, so leaving it out is the right default while a feature is still in development. Removing a flag restores the app's built-in behaviour on the next launch. A user who picks On/Off in the app's debug menu keeps their own setting either way.",
+  "_example": "\"collectionSetup\": false"
 }
