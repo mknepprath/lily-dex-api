@@ -220,12 +220,31 @@ async function build() {
   );
   console.log(`  rankings.json (${(rankings.returnPokemon || []).length} Return Pokemon, ${cupRankings.length} cup(s))`);
 
+  // Remote feature flags — lets a feature be switched off for everyone
+  // without shipping an App Store build.
+  let flags = null;
+  const flagsPath = new URL("../data/flags.json", import.meta.url).pathname;
+  if (existsSync(flagsPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(flagsPath, "utf-8"));
+      flags = Object.fromEntries(
+        Object.entries(parsed).filter(
+          ([key, value]) => !key.startsWith("_") && typeof value === "boolean"
+        )
+      );
+      console.log(`  ${Object.keys(flags).length} feature flag(s) loaded`);
+    } catch (err) {
+      console.warn(`  Flags failed: ${err.message}`);
+    }
+  }
+
   // Meta file
   const meta = {
     buildTime: new Date().toISOString(),
     sources: sourceStatus,
     pokemonCount: pokemon.length,
     version: "1.1.0",
+    ...(flags ? { flags } : {}),
   };
   writeFileSync(`${OUTPUT_DIR}meta.json`, JSON.stringify(meta, null, 2));
   console.log(`  meta.json`);

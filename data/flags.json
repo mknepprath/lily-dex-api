@@ -1,0 +1,4 @@
+{
+  "_comment": "Remote feature flags read by the app at launch. A flag set here overrides the app's built-in default, so a feature can be switched off without an App Store release. Users who explicitly set a flag in the app's debug menu keep their own setting.",
+  "collectionSetup": false
+}
