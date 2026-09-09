@@ -80,7 +80,7 @@ async function fetchScrapedDuck(pokemonNames) {
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
-function parseScrapedDuckEvent(entry, pokemonNames) {
+export function parseScrapedDuckEvent(entry, pokemonNames) {
   if (!entry.eventID || !entry.name) return null;
   if (/example|template|demo|test/i.test(entry.name)) return null;
 
@@ -100,7 +100,18 @@ function parseScrapedDuckEvent(entry, pokemonNames) {
   const imageURL = entry.image || null;
 
   // Extract Pokemon from extraData
-  const pokemonDexNrs = extractPokemonFromExtraData(entry, pokemonNames);
+  const { dexNrs: pokemonDexNrs, formByDex } = extractPokemonFromExtraData(entry, pokemonNames);
+  // Forms named in the title fill the gaps the icons miss; icons win where
+  // both know a form, since they describe the event's own artwork.
+  for (const [dex, form] of extractMegaForms(title, pokemonNames)) {
+    if (!formByDex.has(dex)) formByDex.set(dex, form);
+  }
+  const pokemonSpeciesIds =
+    formByDex.size > 0
+      ? pokemonDexNrs.map((dex) =>
+          formByDex.has(dex) ? `${dex}_${formByDex.get(dex)}` : String(dex)
+        )
+      : null;
 
   return {
     id: entry.eventID,
@@ -114,6 +125,7 @@ function parseScrapedDuckEvent(entry, pokemonNames) {
     url,
     imageURL,
     pokemonDexNrs,
+    ...(pokemonSpeciesIds ? { pokemonSpeciesIds } : {}),
   };
 }
 
@@ -123,14 +135,23 @@ function parseScrapedDuckEvent(entry, pokemonNames) {
  */
 function extractPokemonFromExtraData(entry, pokemonNames) {
   const dexNrs = new Set();
-  const extra = entry.extraData;
-  if (!extra) return [];
+  const formByDex = new Map();
+  const extra = entry.extraData || {};
+
+  // Icons name the form directly (pm15.fMEGA.icon.png), which is more
+  // reliable than the title — parsePokemonIcon reads both dex and form.
+  const addIcon = (url) => {
+    const p = parsePokemonIcon(url);
+    if (!p || !(p.dexNr > 0 && p.dexNr < 2000)) return null;
+    dexNrs.add(p.dexNr);
+    if (p.form) formByDex.set(p.dexNr, p.form);
+    return p.dexNr;
+  };
 
   // Raid bosses
   const bosses = extra.raidbattles?.bosses || [];
   for (const boss of bosses) {
-    const dex = extractDexFromImage(boss.image);
-    if (dex) dexNrs.add(dex);
+    addIcon(boss.image);
     // Also try name matching
     if (boss.name && pokemonNames) {
       const matched = matchNameToDex(boss.name, pokemonNames);
@@ -141,8 +162,7 @@ function extractPokemonFromExtraData(entry, pokemonNames) {
   // Community day spawns
   const spawns = extra.communityday?.spawns || [];
   for (const spawn of spawns) {
-    const dex = extractDexFromImage(spawn.image);
-    if (dex) dexNrs.add(dex);
+    addIcon(spawn.image);
     if (spawn.name && pokemonNames) {
       const matched = matchNameToDex(spawn.name, pokemonNames);
       if (matched) dexNrs.add(matched);
@@ -156,7 +176,7 @@ function extractPokemonFromExtraData(entry, pokemonNames) {
     for (const dex of titleMatched) dexNrs.add(dex);
   }
 
-  return [...dexNrs].sort((a, b) => a - b);
+  return { dexNrs: [...dexNrs].sort((a, b) => a - b), formByDex };
 }
 
 /**

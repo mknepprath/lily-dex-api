@@ -11,6 +11,7 @@ import {
   matchNameToDex,
   extractCandidateNames,
   extractMegaForms,
+  parseScrapedDuckEvent,
   escapeRegex,
 } from "../src/sources/events.js";
 import { parseCupsFromEvents } from "../src/sources/pvpoke.js";
@@ -510,5 +511,44 @@ describe("extractMegaForms", () => {
     // "Mega Raid Day" is an event format, not a mega Staraptor.
     expect(extractMegaForms("Staraptor Super Mega Raid Day", names).size).toBe(0);
     expect(extractMegaForms("Mega Squads", names).size).toBe(0);
+  });
+});
+
+// ─── parseScrapedDuckEvent ────────────────────────────────────────────────────
+
+describe("parseScrapedDuckEvent species ids", () => {
+  const names = new Map([["Beedrill", 15], ["Malamar", 687]]);
+  const base = { eventID: "e1", start: "2026-09-08T20:00:00", end: "2026-09-15T20:00:00" };
+
+  it("emits a mega species id for a mega raid event", () => {
+    // Regression: this path built events without species ids at all, so
+    // "Mega Beedrill in Mega Raids" rendered the base sprite.
+    const e = parseScrapedDuckEvent(
+      { ...base, name: "Mega Beedrill in Mega Raids", eventType: "raid-battles" },
+      names
+    );
+    expect(e.pokemonDexNrs).toEqual([15]);
+    expect(e.pokemonSpeciesIds).toEqual(["15_mega"]);
+  });
+
+  it("reads the form from the boss icon, which names it directly", () => {
+    const e = parseScrapedDuckEvent(
+      {
+        ...base,
+        name: "Raid Hour",
+        eventType: "raid-battles",
+        extraData: { raidbattles: { bosses: [{ name: "Mega Beedrill", image: "https://x/pm15.fMEGA.icon.png" }] } },
+      },
+      names
+    );
+    expect(e.pokemonSpeciesIds).toEqual(["15_mega"]);
+  });
+
+  it("omits species ids when no form is involved", () => {
+    const e = parseScrapedDuckEvent(
+      { ...base, name: "Malamar Spotlight Hour", eventType: "pokemon-spotlight-hour" },
+      names
+    );
+    expect(e.pokemonSpeciesIds).toBeUndefined();
   });
 });
