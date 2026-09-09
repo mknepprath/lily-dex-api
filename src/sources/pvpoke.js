@@ -203,38 +203,120 @@ export async function fetchPvpRankings(speciesIdToDex, speciesIdToName) {
 }
 
 /**
- * Parse GBL event titles to extract specialty cup identifiers.
- * Handles multiple naming formats:
- *   "Ultra League and Fantasy Cup: Great League Edition | Memories in Motion"
- *   "2025 Championship Series Cup and Master League: Mega Edition"
- *   "Fantasy Cup: Great League Edition | Memories in Motion"
+ * Parse GBL event titles into the battle formats worth publishing.
+ *
+ * A rotation's title lists each format as a segment:
+ *   "Great League: Mega Edition, Ultra League: Mega Edition, and Master League: Mega Edition | Twilight Trails"
+ *   "Ultra League, Master League: Mega Edition, and Retro Cup: Great League Edition | Twilight Trails"
+ *
+ * Two kinds of segment matter. "{Name} Cup" is a specialty cup, and
+ * "{League} League: Mega Edition" is that league run with megas legal —
+ * a genuinely different meta that PvPoke publishes as its own "mega"
+ * format at each CP cap. A bare "{League} League" is the standard meta
+ * we already publish at the top level, so it is skipped.
+ *
+ * Rotations that have already ended are dropped, but upcoming ones are
+ * kept: PvPoke publishes a cup's rankings a week or two early so players
+ * can prepare, and the lookahead is self-limiting because rankings that
+ * do not exist yet simply 404 in fetchCupRankings.
  */
 const STANDARD_LEAGUES = new Set(["great league", "ultra league", "master league"]);
+const LEAGUE_CP = { great: 1500, ultra: 2500, master: 10000 };
 
-export function parseCupsFromEvents(events) {
-  const cups = new Map(); // id → display name
+/** Parse an event's window, or null when it carries no usable dates. */
+function eventWindow(event) {
+  const start = event.startDate ? new Date(event.startDate) : null;
+  const end = event.endDate ? new Date(event.endDate) : null;
+  if (!start || !end || isNaN(start) || isNaN(end)) return null;
+  return { start, end };
+}
+
+/** Identify one title segment as a mega league, a cup, or neither. */
+function parseSegment(segment) {
+  const text = segment.trim();
+
+  // "{League} League: Mega Edition" — megas legal, its own PvPoke format.
+  const mega = text.match(/^(great|ultra|master)\s+league\s*:\s*mega\s+edition\b/i);
+  if (mega) {
+    const league = mega[1].toLowerCase();
+    const label = league[0].toUpperCase() + league.slice(1);
+    return { slug: "mega", cp: LEAGUE_CP[league], name: `Mega ${label}` };
+  }
+
+  // "{Name} Cup", optionally "...: {League} League Edition" to set the CP cap.
+  const cup = text.match(/^(.*?)\s+Cup\b(?:\s*:\s*(great|ultra|master)\s+league\s+edition\b)?/i);
+  if (!cup) return null;
+  const rawName = cup[1].replace(/:.*$/, "").trim();
+  if (STANDARD_LEAGUES.has(rawName.toLowerCase())) return null;
+  // Strip leading year: "2025 Championship Series" → "Championship Series"
+  const cleanName = rawName.replace(/^\d+\s+/, "");
+  if (!cleanName) return null;
+  return {
+    slug: cleanName.toLowerCase().replace(/\s+/g, ""),
+    cp: LEAGUE_CP[(cup[2] || "great").toLowerCase()],
+    name: `${cleanName} Cup`,
+  };
+}
+
+export function parseCupsFromEvents(events, now = new Date()) {
+  const candidates = [];
 
   for (const event of events) {
     if (event.tag !== "GBL") continue;
-    // Strip season suffix: "| Memories in Motion" etc.
-    const title = (event.title || "").replace(/\s*\|.*$/, "").trim();
+    const window = eventWindow(event);
+    // An undated event is kept rather than dropped: we cannot filter what we
+    // cannot date, and losing every format is worse than showing a stale one.
+    if (window && window.end <= now) continue;
+    const isLive = !window || (window.start <= now && now < window.end);
 
-    // Split on "and" or commas to isolate each segment, then check for "{Name} Cup"
-    const segments = title.split(/\s*(?:,\s*|\band\b)\s*/);
-    for (const segment of segments) {
-      const match = segment.match(/^(.*?)\s+Cup\b/i);
-      if (!match) continue;
-      // Strip edition suffix: "Fantasy Cup: Great League Edition" → "Fantasy"
-      const rawName = match[1].replace(/:.*$/, "").trim();
-      if (STANDARD_LEAGUES.has(rawName.toLowerCase())) continue;
-      // Strip leading year/numbers: "2025 Championship Series" → "Championship Series"
-      const cleanName = rawName.replace(/^\d+\s+/, "");
-      const id = cleanName.toLowerCase().replace(/\s+/g, "");
-      cups.set(id, `${cleanName} Cup`);
+    // Strip season suffix: "| Twilight Trails" etc.
+    const title = (event.title || "").replace(/\s*\|.*$/, "").trim();
+    // Split on "and" or commas to isolate each format.
+    for (const segment of title.split(/\s*(?:,\s*|\band\b)\s*/)) {
+      const parsed = parseSegment(segment);
+      if (!parsed) continue;
+      // Mega runs at three CP caps under one PvPoke slug, so the cap is part
+      // of its identity. Cups keep the bare slug, which the sprite enrichment
+      // in index.js looks them up by.
+      const id = parsed.slug === "mega" ? `mega-${parsed.cp}` : parsed.slug;
+      candidates.push({ ...parsed, id, isLive, window });
     }
   }
 
-  return [...cups.entries()].map(([id, name]) => ({ id, name }));
+  // A format can appear in more than one rotation. Prefer the live airing, then
+  // the earliest upcoming one, so nothing live is ever labelled as upcoming.
+  const best = new Map();
+  for (const entry of candidates) {
+    const existing = best.get(entry.id);
+    if (!existing) { best.set(entry.id, entry); continue; }
+    if (existing.isLive) continue;
+    if (entry.isLive) { best.set(entry.id, entry); continue; }
+    const a = entry.window?.start, b = existing.window?.start;
+    if (a && b && a < b) best.set(entry.id, entry);
+  }
+
+  return [...best.values()]
+    .sort((a, b) => {
+      if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+      const a0 = a.window?.start, b0 = b.window?.start;
+      if (a0 && b0 && +a0 !== +b0) return a0 - b0;
+      // Same rotation: order by CP cap so mega reads Great, Ultra, Master.
+      if (a.cp !== b.cp) return a.cp - b.cp;
+      return a.name.localeCompare(b.name);
+    })
+    .map((entry) => ({
+      id: entry.id,
+      slug: entry.slug,
+      // Date-stamp upcoming formats so the chip says when it starts. The app
+      // renders cup.name verbatim, so the label has to carry this itself.
+      name: entry.isLive
+        ? entry.name
+        : `${entry.name} (${entry.window.start.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`,
+      cp: entry.cp,
+      isLive: entry.isLive,
+      startDate: entry.window ? entry.window.start.toISOString() : null,
+      endDate: entry.window ? entry.window.end.toISOString() : null,
+    }));
 }
 
 /**
@@ -245,11 +327,11 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
   const cups = parseCupsFromEvents(events);
   if (cups.length === 0) return [];
 
-  console.log(`  Found ${cups.length} specialty cup(s): ${cups.map((c) => c.name).join(", ")}`);
+  console.log(`  Found ${cups.length} format(s): ${cups.map((c) => c.name).join(", ")}`);
 
   // Helper to fetch + map a single role file for a cup; returns null on miss
-  async function fetchCupRole(cupId, role) {
-    const url = `${BASE}/rankings/${cupId}/${role}/rankings-1500.json`;
+  async function fetchCupRole(slug, role, cp) {
+    const url = `${BASE}/rankings/${slug}/${role}/rankings-${cp}.json`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) return null;
@@ -263,7 +345,7 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
 
   const results = [];
   for (const cup of cups) {
-    const url = `${BASE}/rankings/${cup.id}/overall/rankings-1500.json`;
+    const url = `${BASE}/rankings/${cup.slug}/overall/rankings-${cup.cp}.json`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -272,15 +354,15 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
       if (rankings.length > 0) {
         // Fetch role-specific rankings in parallel — non-fatal if missing
         const [leads, switches, closers] = await Promise.all([
-          fetchCupRole(cup.id, "leads"),
-          fetchCupRole(cup.id, "switches"),
-          fetchCupRole(cup.id, "closers"),
+          fetchCupRole(cup.slug, "leads", cup.cp),
+          fetchCupRole(cup.slug, "switches", cup.cp),
+          fetchCupRole(cup.slug, "closers", cup.cp),
         ]);
 
         // Get the actual last commit date for this file from GitHub API
         let lastUpdated = null;
         try {
-          const commitUrl = `https://api.github.com/repos/pvpoke/pvpoke/commits?path=src/data/rankings/${cup.id}/overall/rankings-1500.json&per_page=1`;
+          const commitUrl = `https://api.github.com/repos/pvpoke/pvpoke/commits?path=src/data/rankings/${cup.slug}/overall/rankings-${cup.cp}.json&per_page=1`;
           const commitRes = await fetch(commitUrl, { signal: AbortSignal.timeout(10000) });
           if (commitRes.ok) {
             const commits = await commitRes.json();
@@ -289,12 +371,31 @@ export async function fetchCupRankings(events, speciesIdToDex, speciesIdToName) 
             }
           }
         } catch { /* non-fatal */ }
-        results.push({ id: cup.id, name: cup.name, cp: 1500, lastUpdated, rankings, leads, switches, closers });
+        results.push({
+          id: cup.id,
+          name: cup.name,
+          cp: cup.cp,
+          isLive: cup.isLive,
+          startDate: cup.startDate,
+          endDate: cup.endDate,
+          lastUpdated,
+          rankings,
+          leads,
+          switches,
+          closers,
+        });
         const roleNote = [leads && "leads", switches && "switches", closers && "closers"].filter(Boolean).join("/");
         console.log(`  ${cup.name}: ${rankings.length} rankings${roleNote ? ` + ${roleNote}` : ""} (updated ${lastUpdated || "unknown"})`);
       }
     } catch (err) {
-      console.warn(`  ${cup.name}: no data available (${err.message})`);
+      // An upcoming rotation routinely has no rankings yet — PvPoke publishes
+      // them a week or two out, so this is the expected steady state, not a
+      // failure. Only a live format missing its data is worth warning about.
+      if (cup.isLive) {
+        console.warn(`  ${cup.name}: no data available (${err.message})`);
+      } else {
+        console.log(`  ${cup.name}: not published by PvPoke yet`);
+      }
     }
   }
 

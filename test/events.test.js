@@ -361,4 +361,96 @@ describe("parseCupsFromEvents", () => {
     const result = parseCupsFromEvents(events);
     expect(result.filter((c) => c.id === "fantasy")).toHaveLength(1);
   });
+
+  // ─── rotation windows ───────────────────────────────────────────────────
+
+  const NOW = new Date("2026-09-10T00:00:00Z");
+  const rotation = (title, start, end) => ({
+    tag: "GBL",
+    title,
+    startDate: start,
+    endDate: end,
+  });
+  const ENDED = ["2026-09-01T20:00:00Z", "2026-09-08T20:00:00Z"];
+  const LIVE = ["2026-09-08T20:00:00Z", "2026-09-15T20:00:00Z"];
+  const NEXT = ["2026-09-15T20:00:00Z", "2026-09-22T20:00:00Z"];
+
+  it("drops rotations that have already ended", () => {
+    const events = [rotation("Retro Cup: Great League Edition", ...ENDED)];
+    expect(parseCupsFromEvents(events, NOW)).toEqual([]);
+  });
+
+  it("marks the current rotation live and leaves its name unadorned", () => {
+    const events = [rotation("Retro Cup: Great League Edition", ...LIVE)];
+    const [cup] = parseCupsFromEvents(events, NOW);
+    expect(cup.isLive).toBe(true);
+    expect(cup.name).toBe("Retro Cup");
+  });
+
+  it("keeps upcoming rotations and date-stamps the label", () => {
+    const events = [rotation("Willpower Cup: Great League Edition", ...NEXT)];
+    const [cup] = parseCupsFromEvents(events, NOW);
+    expect(cup.isLive).toBe(false);
+    expect(cup.id).toBe("willpower");
+    expect(cup.name).toMatch(/^Willpower Cup \(/);
+    expect(cup.startDate).toBe(new Date(NEXT[0]).toISOString());
+  });
+
+  it("prefers the live airing when a cup runs in two rotations", () => {
+    const events = [
+      rotation("Retro Cup: Great League Edition", ...NEXT),
+      rotation("Retro Cup: Great League Edition", ...LIVE),
+    ];
+    const result = parseCupsFromEvents(events, NOW);
+    expect(result).toHaveLength(1);
+    expect(result[0].isLive).toBe(true);
+    expect(result[0].name).toBe("Retro Cup");
+  });
+
+  // ─── mega editions ──────────────────────────────────────────────────────
+
+  it("recognises mega editions as their own format at each CP cap", () => {
+    const events = [
+      rotation(
+        "Great League: Mega Edition, Ultra League: Mega Edition, and Master League: Mega Edition",
+        ...LIVE
+      ),
+    ];
+    const result = parseCupsFromEvents(events, NOW);
+    expect(result.map((c) => [c.id, c.slug, c.cp, c.name])).toEqual([
+      ["mega-1500", "mega", 1500, "Mega Great"],
+      ["mega-2500", "mega", 2500, "Mega Ultra"],
+      ["mega-10000", "mega", 10000, "Mega Master"],
+    ]);
+  });
+
+  it("separates mega leagues from standard ones in a mixed rotation", () => {
+    const events = [
+      rotation("Ultra League, Master League: Mega Edition, and Retro Cup: Great League Edition", ...LIVE),
+    ];
+    const result = parseCupsFromEvents(events, NOW);
+    // Plain "Ultra League" is the standard meta we already publish top-level.
+    expect(result.map((c) => c.id).sort()).toEqual(["mega-10000", "retro"]);
+  });
+
+  it("derives a cup's CP cap from its edition suffix", () => {
+    const events = [rotation("Fantasy Cup: Ultra League Edition", ...LIVE)];
+    expect(parseCupsFromEvents(events, NOW)[0].cp).toBe(2500);
+  });
+
+  it("orders live formats ahead of upcoming ones", () => {
+    const events = [
+      rotation("Willpower Cup: Great League Edition", ...NEXT),
+      rotation("Retro Cup: Great League Edition", ...LIVE),
+    ];
+    const result = parseCupsFromEvents(events, NOW);
+    expect(result.map((c) => c.id)).toEqual(["retro", "willpower"]);
+  });
+
+  it("keeps undated events rather than dropping them", () => {
+    const events = [{ tag: "GBL", title: "Fantasy Cup: Great League Edition" }];
+    const [cup] = parseCupsFromEvents(events, NOW);
+    expect(cup.isLive).toBe(true);
+    expect(cup.startDate).toBeNull();
+  });
 });
