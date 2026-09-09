@@ -41,6 +41,27 @@ function buildTypeInfo(typeEnum) {
   };
 }
 
+/**
+ * Form id for a mega, matching PokeAPI's sprite naming and PvPoke's speciesId
+ * so the app can resolve all three without a translation layer:
+ *   CHARIZARD + TEMP_EVOLUTION_MEGA_X → CHARIZARD_MEGA_X → PokeAPI 10034
+ */
+export function megaFormId(pokemonId, tempEvoId) {
+  return `${pokemonId}_${tempEvoId.replace(/^TEMP_EVOLUTION_/, "")}`;
+}
+
+/**
+ * Display name for a mega. Game Master ships no name for these, so it has to
+ * be derived: "Mega Charizard X", "Mega Beedrill", "Primal Kyogre".
+ */
+export function megaFormName(pokemonId, tempEvoId) {
+  const species = idToName(pokemonId);
+  const suffix = tempEvoId.replace(/^TEMP_EVOLUTION_/, "");
+  if (suffix === "PRIMAL") return `Primal ${species}`;
+  const variant = suffix.replace(/^MEGA_?/, "");
+  return variant ? `Mega ${species} ${variant}` : `Mega ${species}`;
+}
+
 export function buildMoveInfo(moveId, movesMap, combatMovesMap) {
   if (!moveId || typeof moveId !== "string") return null;
   const move = movesMap.get(moveId) || movesMap.get(moveId + "_FAST");
@@ -85,7 +106,6 @@ export async function fetchGameMaster() {
   const formsMap = new Map(); // pokemon → forms array
   const movesMap = new Map(); // moveId → move data
   const combatMovesMap = new Map(); // moveId → combat move data
-  const tempEvoMap = new Map(); // pokemon → temp evolution settings
   const questTemplateMap = new Map(); // questId → human-readable description
 
   for (const template of data) {
@@ -127,13 +147,6 @@ export async function fetchGameMaster() {
 
     if (d.combatMove) {
       combatMovesMap.set(d.combatMove.uniqueId, d.combatMove);
-    }
-
-    if (d.temporaryEvolutionSettings) {
-      tempEvoMap.set(
-        d.temporaryEvolutionSettings.pokemonId,
-        d.temporaryEvolutionSettings.temporaryEvolutions || []
-      );
     }
 
     if (d.evolutionQuestTemplate) {
@@ -278,10 +291,14 @@ export async function fetchGameMaster() {
     else if (base.pokemonClass === "POKEMON_CLASS_MYTHIC") pokemonClass = "POKEMON_CLASS_MYTHIC";
     else if (base.pokemonClass === "POKEMON_CLASS_ULTRA_BEAST") pokemonClass = "POKEMON_CLASS_ULTRA_BEAST";
 
-    // Mega evolutions
-    const tempEvos = tempEvoMap.get(base.pokemonId) || [];
+    // Mega evolutions. The stats and type overrides live on the species'
+    // own tempEvoOverrides, not on the temporaryEvolutionSettings template,
+    // which carries only an id and an asset bundle number. Some overrides are
+    // camera/model tweaks with no tempEvoId at all — those are not forms.
+    const tempEvos = (base.tempEvoOverrides || []).filter((evo) => evo.tempEvoId);
     const megaEvolutions = tempEvos.map((evo) => ({
-      id: evo.temporaryEvolutionId,
+      id: evo.tempEvoId,
+      names: { English: megaFormName(base.pokemonId, evo.tempEvoId) },
       stats: evo.stats
         ? {
             stamina: evo.stats.baseStamina || 0,
@@ -292,6 +309,45 @@ export async function fetchGameMaster() {
       primaryType: buildTypeInfo(evo.typeOverride1),
       secondaryType: buildTypeInfo(evo.typeOverride2),
     }));
+
+    // Publish each mega as a form alongside the regional ones. Every consumer
+    // in the app resolves a form by matching a formId suffix against this
+    // list, so a mega that isn't here can only ever render as its base
+    // species. The formId matches PokeAPI's sprite naming (CHARIZARD_MEGA_X)
+    // and PvPoke's speciesId, and dexNr stays the base species so caught
+    // state is untouched.
+    for (const evo of tempEvos) {
+      const formId = megaFormId(base.pokemonId, evo.tempEvoId);
+      if (regionForms[formId]) continue;
+      regionForms[formId] = {
+        id: formId,
+        formId,
+        dexNr,
+        generation: getGeneration(dexNr),
+        names: { English: megaFormName(base.pokemonId, evo.tempEvoId) },
+        stats: {
+          stamina: evo.stats?.baseStamina || base.stats?.baseStamina || 0,
+          attack: evo.stats?.baseAttack || base.stats?.baseAttack || 0,
+          defense: evo.stats?.baseDefense || base.stats?.baseDefense || 0,
+        },
+        // A mega without a type override keeps the base typing (Mega Sableye
+        // stays Dark/Ghost); only the overridden slots change.
+        primaryType: buildTypeInfo(evo.typeOverride1 || base.type),
+        secondaryType: buildTypeInfo(evo.typeOverride2 || base.type2),
+        pokemonClass: null,
+        // Megas battle with their base species' moves.
+        quickMoves,
+        cinematicMoves,
+        eliteQuickMoves: [],
+        eliteCinematicMoves: [],
+        evolutions: [],
+        hasMegaEvolution: false,
+        megaEvolutions: [],
+        hasGigantamaxEvolution: false,
+        regionForms: [],
+        assetForms: [],
+      };
+    }
 
     pokemon.push({
       id: String(base.pokemonId),

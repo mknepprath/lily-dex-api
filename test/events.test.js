@@ -10,9 +10,11 @@ import {
   extractDexFromImage,
   matchNameToDex,
   extractCandidateNames,
+  extractMegaForms,
   escapeRegex,
 } from "../src/sources/events.js";
 import { parseCupsFromEvents } from "../src/sources/pvpoke.js";
+import { megaFormId, megaFormName } from "../src/sources/game-master.js";
 
 // ─── parseISOToNaive ──────────────────────────────────────────────────────────
 
@@ -452,5 +454,61 @@ describe("parseCupsFromEvents", () => {
     const [cup] = parseCupsFromEvents(events, NOW);
     expect(cup.isLive).toBe(true);
     expect(cup.startDate).toBeNull();
+  });
+});
+
+// ─── mega forms ───────────────────────────────────────────────────────────────
+
+describe("megaFormId", () => {
+  it("matches PokeAPI and PvPoke naming", () => {
+    expect(megaFormId("CHARIZARD", "TEMP_EVOLUTION_MEGA_X")).toBe("CHARIZARD_MEGA_X");
+    expect(megaFormId("BEEDRILL", "TEMP_EVOLUTION_MEGA")).toBe("BEEDRILL_MEGA");
+    expect(megaFormId("KYOGRE", "TEMP_EVOLUTION_PRIMAL")).toBe("KYOGRE_PRIMAL");
+  });
+});
+
+describe("megaFormName", () => {
+  it("names plain megas", () => {
+    expect(megaFormName("BEEDRILL", "TEMP_EVOLUTION_MEGA")).toBe("Mega Beedrill");
+  });
+
+  it("keeps the variant letter last", () => {
+    expect(megaFormName("CHARIZARD", "TEMP_EVOLUTION_MEGA_X")).toBe("Mega Charizard X");
+    expect(megaFormName("MEWTWO", "TEMP_EVOLUTION_MEGA_Y")).toBe("Mega Mewtwo Y");
+  });
+
+  it("names primals with their own prefix", () => {
+    expect(megaFormName("KYOGRE", "TEMP_EVOLUTION_PRIMAL")).toBe("Primal Kyogre");
+  });
+});
+
+describe("extractMegaForms", () => {
+  const names = new Map([
+    ["Gyarados", 130],
+    ["Charizard", 6],
+    ["Kyogre", 382],
+    ["Staraptor", 398],
+  ]);
+
+  it("returns empty when no mega is named", () => {
+    expect(extractMegaForms("Community Day: Bulbasaur", names).size).toBe(0);
+  });
+
+  it("detects a plain mega", () => {
+    expect([...extractMegaForms("Mega Gyarados in Mega Raids", names)]).toEqual([[130, "mega"]]);
+  });
+
+  it("captures the variant letter", () => {
+    expect([...extractMegaForms("Mega Charizard X in Mega Raids", names)]).toEqual([[6, "mega_x"]]);
+  });
+
+  it("detects primals", () => {
+    expect([...extractMegaForms("Primal Kyogre in Raids", names)]).toEqual([[382, "primal"]]);
+  });
+
+  it("does not match a bare 'Mega' that is not a form", () => {
+    // "Mega Raid Day" is an event format, not a mega Staraptor.
+    expect(extractMegaForms("Staraptor Super Mega Raid Day", names).size).toBe(0);
+    expect(extractMegaForms("Mega Squads", names).size).toBe(0);
   });
 });

@@ -247,6 +247,15 @@ function parseICS(icsText, pokemonNames) {
     }
 
     const pokemonDexNrs = matchPokemon(title, tag, pokemonNames);
+    // Megas named in the title get a species id so the app renders the mega
+    // rather than the base species.
+    const megaForms = extractMegaForms(title, pokemonNames);
+    const pokemonSpeciesIds =
+      megaForms.size > 0
+        ? pokemonDexNrs.map((dex) =>
+            megaForms.has(dex) ? `${dex}_${megaForms.get(dex)}` : String(dex)
+          )
+        : null;
 
     events.push({
       id: fields.UID,
@@ -260,6 +269,7 @@ function parseICS(icsText, pokemonNames) {
       url,
       imageURL,
       pokemonDexNrs,
+      ...(pokemonSpeciesIds ? { pokemonSpeciesIds } : {}),
     });
   }
 
@@ -299,9 +309,19 @@ async function enrichFromLeekDuck(events) {
             event.pokemonDexNrs = merged;
             // Emit species IDs aligned with pokemonDexNrs so the app can render
             // regional forms (e.g. Galarian Meowth) instead of the base sprite.
-            if (formByDex.size > 0) {
+            // Forms already derived from the title are folded in first — the
+            // merge above can add dex numbers, and a stale speciesIds array
+            // would then point at the wrong Pokemon. Scraped icons win, since
+            // they describe the event page itself.
+            const formsByDex = new Map();
+            for (const sid of event.pokemonSpeciesIds || []) {
+              const [dex, ...form] = sid.split("_");
+              if (form.length > 0) formsByDex.set(parseInt(dex, 10), form.join("_"));
+            }
+            for (const [dex, form] of formByDex) formsByDex.set(dex, form);
+            if (formsByDex.size > 0) {
               event.pokemonSpeciesIds = merged.map((dex) =>
-                formByDex.has(dex) ? `${dex}_${formByDex.get(dex)}` : String(dex)
+                formsByDex.has(dex) ? `${dex}_${formsByDex.get(dex)}` : String(dex)
               );
             }
             enriched++;
@@ -477,6 +497,31 @@ function matchPokemon(title, tag, pokemonNames) {
   }
 
   return [...new Set(matched)];
+}
+
+/**
+ * Detect mega and primal forms named in an event title, as dexNr → form
+ * suffix. "Mega Gyarados in Mega Raids" → 130 → "mega".
+ *
+ * The suffix is what the app matches against a form's id, so it has to line
+ * up with the game master form ids: mega, mega_x, mega_y, primal.
+ */
+export function extractMegaForms(title, pokemonNames) {
+  const forms = new Map();
+  if (!pokemonNames || !/\b(mega|primal)\b/i.test(title)) return forms;
+
+  for (const [name, dex] of pokemonNames) {
+    const esc = escapeRegex(name);
+    // "Mega Charizard X" carries its variant letter; plain "Mega Beedrill"
+    // does not. Anchor on the name so "Mega Raids" matches nothing.
+    const mega = title.match(new RegExp(`\\bMega\\s+${esc}\\b(?:\\s+([XY])\\b)?`, "i"));
+    if (mega) {
+      forms.set(dex, mega[1] ? `mega_${mega[1].toLowerCase()}` : "mega");
+    } else if (new RegExp(`\\bPrimal\\s+${esc}\\b`, "i").test(title)) {
+      forms.set(dex, "primal");
+    }
+  }
+  return forms;
 }
 
 export function extractCandidateNames(title, tag) {
