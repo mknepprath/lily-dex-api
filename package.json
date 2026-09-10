@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node src/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "conformance": "node tools/conformance.js"
   },
   "engines": {
     "node": ">=20"
