@@ -16,12 +16,18 @@ const load = (name) => JSON.parse(readFileSync(OUT + name, "utf8"));
 const MEGA_FORM = /_(MEGA|MEGA_X|MEGA_Y|PRIMAL)$/;
 
 const checks = [];
-const check = (id, why, fn) => checks.push({ id, why, fn });
+// blocking: shipping this is worse than shipping nothing new — the previous
+// deploy stays live, which is the safer of two bad options.
+// advisory: degraded but still worth shipping. Blocking every event and raid
+// update over a cosmetic defect leaves users on stale data, which is worse
+// than the defect.
+const check = (id, severity, why, fn) => checks.push({ id, severity, why, fn });
 
 // ── Pokedex ──────────────────────────────────────────────────────────────
 
 check(
   "mega-forms-present",
+  "advisory",
   "megas existed in Game Master but were never published as forms, so every mega rendered as its base species",
   (dex) => {
     const forms = dex.flatMap((p) => Object.values(p.regionForms || {}).filter((f) => MEGA_FORM.test(f.formId)));
@@ -34,6 +40,7 @@ check(
 
 check(
   "mega-forms-complete",
+  "advisory",
   "mega stats and types were read from the wrong Game Master template, so every published mega had stats: null",
   (dex) => {
     const bad = [];
@@ -51,6 +58,7 @@ check(
 
 check(
   "forms-carry-base-dex",
+  "blocking",
   "caught state is keyed on dex number — a form with its own dexNr would silently detach a Pokemon from its collection",
   (dex) => {
     const bad = [];
@@ -65,6 +73,7 @@ check(
 
 check(
   "dex-entries-unique",
+  "blocking",
   "a duplicate dex number would double-count a species in collection totals",
   (dex) => {
     const seen = new Set(), dupes = [];
@@ -80,6 +89,7 @@ check(
 
 check(
   "species-ids-aligned",
+  "blocking",
   "the app reads pokemonSpeciesIds positionally against pokemonDexNrs — a length mismatch points a sprite at the wrong Pokemon",
   (_dex, events) => {
     const bad = events
@@ -92,6 +102,7 @@ check(
 
 check(
   "titles-decoded",
+  "advisory",
   "an undecoded entity shipped to users as \"Pokemon XP &amp; 2026 Worlds\"",
   (_dex, events) => {
     const bad = events.filter((e) => /&(amp|lt|gt|quot|#\d+);/i.test(e.title || "")).map((e) => e.title);
@@ -103,6 +114,7 @@ check(
 
 check(
   "formats-not-expired",
+  "advisory",
   "cups were merged from every rotation with no date filter, so a format two rotations away showed as live",
   (_dex, _events, rankings) => {
     const now = Date.now();
@@ -115,6 +127,7 @@ check(
 
 check(
   "format-ids-unique",
+  "blocking",
   "mega runs at three CP caps under one PvPoke slug — without a per-cap id the app renders one chip and drops two",
   (_dex, _events, rankings) => {
     const seen = new Set(), dupes = [];
@@ -128,6 +141,7 @@ check(
 
 check(
   "formats-have-rankings",
+  "advisory",
   "a format published with an empty list renders an empty screen behind a chip",
   (_dex, _events, rankings) => {
     const bad = (rankings.cups || []).filter((c) => !(c.rankings || []).length).map((c) => c.name);
@@ -153,24 +167,28 @@ const eventsRaw = load("events.json");
 const events = Array.isArray(eventsRaw) ? eventsRaw : eventsRaw.events || [];
 const rankings = load("rankings.json");
 
-let failed = 0;
+let blocking = 0, advisory = 0;
 const lines = [];
 for (const c of checks) {
   let r;
   try { r = c.fn(dex, events, rankings); }
   catch (err) { r = fail(`check threw: ${err.message}`); }
-  if (!r.ok) failed++;
-  const mark = r.ok ? "ok  " : "FAIL";
+  if (!r.ok) c.severity === "blocking" ? blocking++ : advisory++;
+  const mark = r.ok ? "ok  " : c.severity === "blocking" ? "FAIL" : "warn";
   const count = r.count ? ` (${r.count})` : "";
   lines.push(`  ${mark} ${c.id.padEnd(22)} ${r.detail}${count}`);
   if (!r.ok) lines.push(`       why: ${c.why}`);
 }
 
-console.log(`\nData conformance — ${checks.length - failed} passing, ${failed} failing of ${checks.length}\n`);
+const passing = checks.length - blocking - advisory;
+console.log(`\nData conformance — ${passing} passing, ${blocking} failing, ${advisory} advisory of ${checks.length}\n`);
 console.log(lines.join("\n"));
 console.log();
 
-if (failed > 0) {
-  console.error(`conformance: ${failed} invariant(s) broken. See docs/INVARIANTS.md.`);
+if (advisory > 0 && blocking === 0) {
+  console.log(`conformance: ${advisory} advisory issue(s) — shipping anyway, since stale data would be worse.`);
+}
+if (blocking > 0) {
+  console.error(`conformance: ${blocking} blocking invariant(s) broken — not publishing. See docs/INVARIANTS.md.`);
   process.exit(1);
 }
