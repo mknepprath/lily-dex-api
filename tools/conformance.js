@@ -85,6 +85,26 @@ check(
   }
 );
 
+check(
+  "elite-moves-not-regular",
+  "advisory",
+  "a shared move object let mega supplementation write legacy moves into the base species' regular list; the app then drew Frenzy Plant, Psystrike and 44 others as ordinary moves",
+  (dex) => {
+    const keys = (m) => (Array.isArray(m) ? m.map((x) => x.id || x) : Object.keys(m || {}));
+    const overlap = (entry, label) => {
+      const regular = new Set([...keys(entry.quickMoves), ...keys(entry.cinematicMoves)]);
+      return [...keys(entry.eliteQuickMoves), ...keys(entry.eliteCinematicMoves)]
+        .filter((id) => regular.has(id))
+        .map((id) => `${label}: ${id}`);
+    };
+    const bad = dex.flatMap((p) => [
+      ...overlap(p, p.names?.English || `#${p.dexNr}`),
+      ...Object.values(p.regionForms || {}).flatMap((f) => overlap(f, f.formId)),
+    ]);
+    return bad.length ? fail(bad.slice(0, 5).join("; "), bad.length) : pass("no move is listed as both regular and elite");
+  }
+);
+
 // ── Events ───────────────────────────────────────────────────────────────
 
 check(

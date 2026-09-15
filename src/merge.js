@@ -245,7 +245,9 @@ function supplementMovesFromPvPoke(gm, pvpoke, gameMaster) {
 
       if (form.cinematicMoves && typeof form.cinematicMoves === "object" && !Array.isArray(form.cinematicMoves)) {
         for (const moveId of formPvpMoves.chargedMoves) {
-          if (!form.cinematicMoves[moveId]) {
+          // PvPoke folds legacy moves into a form's charged list. Adding one
+          // here would make it read as an ordinary move, hiding its Elite badge.
+          if (!form.cinematicMoves[moveId] && !form.eliteCinematicMoves?.[moveId]) {
             const info = buildMoveInfo(moveId, movesMap, combatMovesMap);
             if (info) {
               form.cinematicMoves[moveId] = info;

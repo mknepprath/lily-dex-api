@@ -55,6 +55,14 @@ mega form in for display is safe.
 A duplicate double-counts a species in collection totals, which are the app's
 central number.
 
+**4a. A move is regular or elite, never both.** `elite-moves-not-regular` — advisory
+The app marks a move Elite only when it is absent from the regular list, so a
+legacy move that also appears there renders as ordinary. Mega forms were given
+the base species' move objects by reference; PvPoke supplementation then wrote
+each mega's legacy moves into that shared object, and 46 elite moves across
+every mega-capable species lost their badge. Game Master itself never overlaps —
+the leak is always ours.
+
 **5. Species ids align positionally with dex numbers.** `species-ids-aligned` — blocking
 The app walks `pokemonDexNrs` by index and reads `pokemonSpeciesIds[index]`. A
 length mismatch does not error — it points a sprite at a different Pokémon. The

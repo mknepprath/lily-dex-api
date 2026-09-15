@@ -335,11 +335,16 @@ export async function fetchGameMaster() {
         primaryType: buildTypeInfo(evo.typeOverride1 || base.type),
         secondaryType: buildTypeInfo(evo.typeOverride2 || base.type2),
         pokemonClass: null,
-        // Megas battle with their base species' moves.
-        quickMoves,
-        cinematicMoves,
-        eliteQuickMoves: [],
-        eliteCinematicMoves: [],
+        // Megas battle with their base species' moves, legacy ones included.
+        // Copies, never references: merge.js supplements each form's move
+        // lists in place, so a shared object would write a mega's supplemented
+        // moves straight into the base species' regular list. That is how
+        // Frenzy Plant, Psystrike and every other legacy move on a mega-capable
+        // species lost its Elite badge.
+        quickMoves: { ...quickMoves },
+        cinematicMoves: { ...cinematicMoves },
+        eliteQuickMoves: Object.keys(eliteQuickMoves).length > 0 ? { ...eliteQuickMoves } : [],
+        eliteCinematicMoves: Object.keys(eliteCinematicMoves).length > 0 ? { ...eliteCinematicMoves } : [],
         evolutions: [],
         hasMegaEvolution: false,
         megaEvolutions: [],
