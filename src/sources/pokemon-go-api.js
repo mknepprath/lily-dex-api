@@ -8,7 +8,9 @@ export async function fetchPokemonGoApi() {
     fetchWithCache("raids", `${BASE}/raidboss.json`),
     fetchWithCache("max-battles", `${BASE}/maxbattles.json`),
     fetchWithCache("quests", `${BASE}/quests.json`),
-    fetchWithCache("types", `${BASE}/types.json`),
+    // The 18 types have been fixed since Fairy arrived in 2013 — owned data,
+    // refreshed opportunistically, never allowed to shrink.
+    fetchWithCache("types", `${BASE}/types.json`, { dir: "data", neverShrink: true }),
   ]);
 
   // Build lookup maps from pokedex for supplementary data

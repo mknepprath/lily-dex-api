@@ -39,7 +39,7 @@ jobs:
           # -u stages only files git already tracks, so a stray file left in
           # cache/ by an ad-hoc script is never swept into the repo. A genuinely
           # new cache file is added deliberately, once.
-          git add -u cache/
+          git add -u cache/ data/
           git diff --staged --quiet || git commit -m "Update cached data"
           git push
 

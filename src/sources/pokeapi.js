@@ -5,7 +5,10 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 
 const BASE = "https://pokeapi.co/api/v2";
-const CACHE_PATH = new URL("../../cache/pokeapi-evolution-chains.json", import.meta.url).pathname;
+// Owned, not cached: evolution chains only change when a new generation ships,
+// so this file is the dataset and PokeAPI is a refresher for it. It sits in
+// data/ so a routine "clear the cache" can never wipe the guard's baseline.
+const CACHE_PATH = new URL("../../data/evolution-chains.json", import.meta.url).pathname;
 const BATCH = 50;
 
 export async function fetchEvolutionChains() {
@@ -67,12 +70,12 @@ export async function fetchEvolutionChains() {
     // run was incomplete, not that Pokemon stopped evolving.
     const count = Object.keys(familyByDex).length;
     if (skipped > 0) {
-      console.warn(`  pokeapi-evolution-chains: ${skipped} chain(s) failed to fetch`);
+      console.warn(`  evolution-chains: ${skipped} chain(s) failed to fetch`);
     }
     const cachedCount = readCachedCount();
     if (cachedCount !== null && count < cachedCount) {
       console.warn(
-        `  pokeapi-evolution-chains: run returned ${count} species, cache has ${cachedCount} — ` +
+        `  evolution-chains: run returned ${count} species, cache has ${cachedCount} — ` +
           `keeping cache (set ALLOW_EVOLUTION_SHRINK=1 to overwrite)`
       );
       if (!process.env.ALLOW_EVOLUTION_SHRINK) {
@@ -82,15 +85,15 @@ export async function fetchEvolutionChains() {
     }
 
     writeFileSync(CACHE_PATH, JSON.stringify(familyByDex));
-    console.log(`  pokeapi-evolution-chains: fresh (${count} species)`);
+    console.log(`  evolution-chains: fresh (${count} species)`);
     return { familyByDex: toMap(familyByDex), status: "fresh" };
   } catch (err) {
-    console.warn(`  pokeapi-evolution-chains: fetch failed (${err.message}), using cache`);
+    console.warn(`  evolution-chains: fetch failed (${err.message}), using cache`);
     if (existsSync(CACHE_PATH)) {
       const data = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
       return { familyByDex: toMap(data), status: "cached", error: err.message };
     }
-    console.warn("  pokeapi-evolution-chains: no cache available");
+    console.warn("  evolution-chains: no cache available");
     return { familyByDex: new Map(), status: "error", error: err.message };
   }
 }

@@ -1,9 +1,21 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 
 const CACHE_DIR = new URL("../cache/", import.meta.url).pathname;
+const DATA_DIR = new URL("../data/", import.meta.url).pathname;
 
-export async function fetchWithCache(name, url, { timeout } = {}) {
-  const cachePath = `${CACHE_DIR}${name}.json`;
+const size = (d) => (Array.isArray(d) ? d.length : d && typeof d === "object" ? Object.keys(d).length : 0);
+
+/**
+ * Fetch JSON, falling back to the stored copy when the fetch fails.
+ *
+ * `dir: "data"` marks a source we own rather than merely cache — it lives
+ * beside the hand-maintained files, where nobody clears it to force a rebuild.
+ * `neverShrink` refuses a smaller payload than the stored one, for reference
+ * data that only ever grows; a 200 response carrying half the rows is a
+ * degraded source, not news.
+ */
+export async function fetchWithCache(name, url, { timeout, dir = "cache", neverShrink = false } = {}) {
+  const cachePath = `${dir === "data" ? DATA_DIR : CACHE_DIR}${name}.json`;
   try {
     console.log(`  Fetching ${name}...`);
     // A hung request would otherwise stall the whole build; callers that
@@ -11,6 +23,17 @@ export async function fetchWithCache(name, url, { timeout } = {}) {
     const res = await fetch(url, timeout ? { signal: AbortSignal.timeout(timeout) } : undefined);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+
+    if (neverShrink && existsSync(cachePath)) {
+      try {
+        const stored = JSON.parse(readFileSync(cachePath, "utf-8"));
+        if (size(data) < size(stored)) {
+          console.warn(`  ${name}: got ${size(data)} entries, stored has ${size(stored)} — keeping stored copy`);
+          return { data: stored, status: "cached", error: `shrunk (${size(data)} < ${size(stored)})` };
+        }
+      } catch { /* unreadable stored copy: fall through and replace it */ }
+    }
+
     writeFileSync(cachePath, JSON.stringify(data));
     console.log(`  ${name}: fresh`);
     return { data, status: "fresh" };

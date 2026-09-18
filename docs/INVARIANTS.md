@@ -21,6 +21,24 @@ Two consequences worth stating plainly:
   compiler was satisfied. It was caught by a person looking at a screenshot.
   Invariants are for claims about data, not about pixels.
 
+## Owned data vs cache
+
+`cache/` is refetchable and safe to delete. `data/` is ours: the hand-maintained
+files, plus reference data we keep rather than merely cache.
+
+`data/evolution-chains.json` and `data/types.json` live there because the facts
+underneath them only change when a new generation ships. PokeAPI and the Pokémon
+GO API refresh them; they do not own them. Both are marked never-shrink, because
+a 200 response carrying fewer rows is a degraded source, not news — the evolution
+fetch assembles ~550 individual requests and silently skips any that rate-limit,
+so a throttled run is indistinguishable from a successful smaller one.
+
+The directory matters as much as the guard: a never-shrink check compares against
+the stored copy, so with no stored copy any payload sets the baseline. In `cache/`
+a routine clear-it-and-rebuild would hand that baseline to whatever the next run
+happened to fetch. If either upstream disappears for good, delete the fetch and
+keep the file — it needs a human edit about once per generation.
+
 ## Blocking or advisory
 
 A failed check either stops the deploy or does not, and the line is drawn by
