@@ -72,6 +72,24 @@ earlier must be folded in rather than left behind.
 **6. Event titles are decoded.** `titles-decoded` — advisory
 `Pokémon XP &amp; 2026 Worlds` shipped to users.
 
+**6a. The event feed is never empty.** `events-not-empty` — blocking
+Every event source traces back to one root: ScrapedDuck. The ICS "fallback" is
+go-calendar, which consumes the same `events.min.json`, so it fails in lockstep
+rather than covering for it. An empty feed also empties the Battle screen, whose
+formats are parsed from GBL event titles — the dex and PvP rankings survive, the
+events and formats do not. Stale data always beats none, so this blocks.
+
+**6b. The event feed is not frozen.** `events-not-stale` — advisory
+ScrapedDuck can keep serving while it stops updating: the fetch succeeds, the
+cache refreshes with stale content, and no layer reports anything. Since every
+source agrees on the stale data, none of them can detect it — so the check
+fingerprints the feed's content and records when that exact content first
+appeared, warning after 5 identical days. A horizon check ("the furthest event
+has passed") was considered and rejected: the feed runs ~75 days ahead, so it
+would take two months to fire. The fingerprint lives in
+`cache/events-fingerprint.json` and must stay tracked by git, or it resets every
+build and can never detect anything.
+
 **7. No expired battle format is published.** `formats-not-expired` — advisory
 Cups were merged from every GBL rotation with no date filter, so a format two
 rotations away appeared as the live one while the actual rotation went unnamed.

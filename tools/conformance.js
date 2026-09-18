@@ -9,7 +9,8 @@
  *
  * Every check here exists because it failed in production at least once.
  */
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { createHash } from "crypto";
 
 const OUT = new URL("../output/", import.meta.url).pathname;
 const load = (name) => JSON.parse(readFileSync(OUT + name, "utf8"));
@@ -127,6 +128,45 @@ check(
   (_dex, events) => {
     const bad = events.filter((e) => /&(amp|lt|gt|quot|#\d+);/i.test(e.title || "")).map((e) => e.title);
     return bad.length ? fail(bad.slice(0, 3).join("; "), bad.length) : pass("no HTML entities in event titles");
+  }
+);
+
+check(
+  "events-not-empty",
+  "blocking",
+  "every event source traces to ScrapedDuck, so one outage can empty the feed — and an empty events.json also empties the Battle screen's formats, which are parsed from GBL events",
+  (_dex, events) =>
+    events.length > 0
+      ? pass(`${events.length} events`)
+      : fail("events.json is empty — publishing this would wipe events and battle formats for every user")
+);
+
+check(
+  "events-not-stale",
+  "advisory",
+  "ScrapedDuck can keep serving while it stops updating; the fetch succeeds, the cache refreshes with stale data, and nothing else notices",
+  (_dex, events) => {
+    // The feed's own content is the only staleness signal available: every
+    // source (primary, ICS fallback, cache) agrees on stale data, so none of
+    // them can report it. Fingerprint the feed and remember when this exact
+    // content first appeared. Horizon-based checks were considered and
+    // rejected — the feed runs ~75 days ahead, so they take two months to fire.
+    const STALE_DAYS = 5;
+    const path = new URL("../cache/events-fingerprint.json", import.meta.url).pathname;
+    const hash = createHash("sha256").update(JSON.stringify(events)).digest("hex").slice(0, 16);
+    let firstSeen = new Date().toISOString();
+    if (existsSync(path)) {
+      try {
+        const prev = JSON.parse(readFileSync(path, "utf8"));
+        if (prev.hash === hash && prev.firstSeen) firstSeen = prev.firstSeen;
+      } catch { /* corrupt fingerprint: start over */ }
+    }
+    writeFileSync(path, JSON.stringify({ hash, firstSeen }, null, 2) + "\n");
+
+    const days = (Date.now() - new Date(firstSeen)) / 86400000;
+    return days > STALE_DAYS
+      ? fail(`the event feed has been byte-identical for ${days.toFixed(1)} days — ScrapedDuck has likely stopped updating`)
+      : pass(`feed content ${days < 0.1 ? "changed this build" : `${days.toFixed(1)} days old`}`);
   }
 );
 
