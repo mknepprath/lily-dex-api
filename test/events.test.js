@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   parseISOToNaive,
-  parseTag,
-  parseICSDate,
-  unescapeICS,
   decodeHTMLEntities,
   parsePokemonIcon,
   extractPokemonFromHTML,
@@ -47,59 +44,6 @@ describe("parseISOToNaive", () => {
   });
 });
 
-// ─── parseTag ─────────────────────────────────────────────────────────────────
-
-describe("parseTag", () => {
-  it("extracts tag and title from bracketed prefix", () => {
-    const result = parseTag("[CD] Bulbasaur Community Day");
-    expect(result.tag).toBe("CD");
-    expect(result.title).toBe("Bulbasaur Community Day");
-  });
-
-  it("returns empty tag when no bracket", () => {
-    const result = parseTag("Some Event Without Tag");
-    expect(result.tag).toBe("");
-    expect(result.title).toBe("Some Event Without Tag");
-  });
-
-  it("handles multi-letter tags", () => {
-    const result = parseTag("[GBL] Great League");
-    expect(result.tag).toBe("GBL");
-  });
-
-  it("trims leading space after bracket", () => {
-    const result = parseTag("[RH] Mewtwo Raid Hour");
-    expect(result.title).toBe("Mewtwo Raid Hour");
-  });
-});
-
-// ─── parseICSDate ─────────────────────────────────────────────────────────────
-
-describe("parseICSDate", () => {
-  it("returns null for falsy input", () => {
-    expect(parseICSDate(null)).toEqual({ dateStr: null, isAllDay: false });
-    expect(parseICSDate("")).toEqual({ dateStr: null, isAllDay: false });
-  });
-
-  it("parses 8-digit all-day date", () => {
-    const result = parseICSDate("20260314");
-    expect(result.dateStr).toBe("2026-03-14");
-    expect(result.isAllDay).toBe(true);
-  });
-
-  it("parses timed date", () => {
-    const result = parseICSDate("20260314T140000");
-    expect(result.dateStr).toBe("2026-03-14T14:00:00");
-    expect(result.isAllDay).toBe(false);
-  });
-
-  it("handles UTC Z suffix on timed date", () => {
-    const result = parseICSDate("20260314T140000Z");
-    expect(result.dateStr).toBe("2026-03-14T14:00:00");
-    expect(result.isAllDay).toBe(false);
-  });
-});
-
 // ─── decodeHTMLEntities ──────────────────────────────────────────────────────
 
 describe("decodeHTMLEntities", () => {
@@ -126,30 +70,6 @@ describe("decodeHTMLEntities", () => {
   it("handles non-string input", () => {
     expect(decodeHTMLEntities("")).toBe("");
     expect(decodeHTMLEntities(undefined)).toBe(undefined);
-  });
-});
-
-// ─── unescapeICS ─────────────────────────────────────────────────────────────
-
-describe("unescapeICS", () => {
-  it("converts \\n to newline", () => {
-    expect(unescapeICS("line1\\nline2")).toBe("line1\nline2");
-  });
-
-  it("unescapes commas", () => {
-    expect(unescapeICS("a\\,b")).toBe("a,b");
-  });
-
-  it("unescapes semicolons", () => {
-    expect(unescapeICS("a\\;b")).toBe("a;b");
-  });
-
-  it("unescapes backslash", () => {
-    expect(unescapeICS("a\\\\b")).toBe("a\\b");
-  });
-
-  it("passes through unescaped text", () => {
-    expect(unescapeICS("Hello World")).toBe("Hello World");
   });
 });
 

@@ -1,8 +1,7 @@
 /**
  * Fetch Pokemon GO events from multiple sources.
  *
- * Primary: ScrapedDuck JSON (rich structured data)
- * Fallback: go-calendar ICS (community-maintained)
+ * Source: ScrapedDuck JSON (itself built from Leek Duck)
  * Enrichment: Leek Duck page scraping (Pokemon lists)
  *
  * Timestamps are kept as naive strings (no timezone) so the app
@@ -13,8 +12,6 @@ import { fetchWithCache } from "../utils.js";
 
 const SCRAPEDDUCK_URL =
   "https://raw.githubusercontent.com/bigfoott/ScrapedDuck/data/events.min.json";
-const CALENDAR_URL =
-  "https://github.com/othyn/go-calendar/releases/latest/download/gocal.ics";
 
 // ScrapedDuck eventType → our tag mapping
 const TYPE_TO_TAG = {
@@ -36,44 +33,33 @@ const TYPE_TO_TAG = {
 export async function fetchEvents(pokemonNames) {
   console.log("  Fetching events...");
 
-  // Try ScrapedDuck first
   let events = [];
-  let source = "none";
-
   try {
     events = await fetchScrapedDuck(pokemonNames);
-    source = "scrapedduck";
     console.log(`  ScrapedDuck: ${events.length} events`);
   } catch (err) {
+    // No second source to fall back to — the go-calendar ICS that used to sit
+    // here was itself built from this same ScrapedDuck feed, so it failed in
+    // lockstep while looking like redundancy. The committed cache is the real
+    // protection; if that is gone too, publishing nothing beats publishing an
+    // empty feed, which the events-not-empty invariant enforces.
     console.warn(`  ScrapedDuck failed: ${err.message}`);
-  }
-
-  // Fallback to ICS if ScrapedDuck failed or returned nothing
-  if (events.length === 0) {
-    try {
-      events = await fetchICS(pokemonNames);
-      source = "ics";
-      console.log(`  ICS fallback: ${events.length} events`);
-    } catch (err) {
-      console.warn(`  ICS fallback also failed: ${err.message}`);
-      return { events: [], status: "error" };
-    }
+    return { events: [], status: "error" };
   }
 
   // Enrich events with Pokemon from Leek Duck pages
   await enrichFromLeekDuck(events);
 
-  console.log(`  ${events.length} events total (source: ${source})`);
+  console.log(`  ${events.length} events total`);
   return { events, status: "fresh" };
 }
 
 // ─── ScrapedDuck ────────────────────────────────────────────
 
 async function fetchScrapedDuck(pokemonNames) {
-  // Cached like every other source. Events were the one source fetched raw,
-  // so a transient outage dropped us to the thinner ICS fallback — or, if that
-  // failed in the same build, published an empty event list to every user.
-  // Serving the last good copy is better than either.
+  // Cached like every other source, and now the only thing standing between a
+  // ScrapedDuck outage and an empty event feed. Serving the last good copy
+  // keeps events and the Battle screen's formats alive until it recovers.
   const { data, status, error } = await fetchWithCache("events-scrapedduck", SCRAPEDDUCK_URL, {
     timeout: 15000,
   });
@@ -234,78 +220,6 @@ export function parseISOToNaive(iso) {
     .replace(/Z$/, "");
 }
 
-// ─── ICS Fallback ───────────────────────────────────────────
-
-async function fetchICS(pokemonNames) {
-  const res = await fetch(CALENDAR_URL, { redirect: "follow" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const icsText = await res.text();
-  return parseICS(icsText, pokemonNames);
-}
-
-function parseICS(icsText, pokemonNames) {
-  const unfolded = icsText.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
-  const events = [];
-  const blocks = unfolded.split("BEGIN:VEVENT");
-
-  for (let i = 1; i < blocks.length; i++) {
-    const block = blocks[i].split("END:VEVENT")[0];
-    const fields = extractFields(block);
-
-    if (!fields.UID || !fields.SUMMARY) continue;
-
-    const summary = decodeHTMLEntities(unescapeICS(fields.SUMMARY));
-    if (/example|template|demo|test/i.test(summary)) continue;
-    const { tag, title } = parseTag(summary);
-
-    const { dateStr: startDate, isAllDay } = parseICSDate(
-      fields["DTSTART;VALUE=DATE"] || fields.DTSTART
-    );
-    const { dateStr: endDate } = parseICSDate(
-      fields["DTEND;VALUE=DATE"] || fields.DTEND
-    );
-    if (!startDate || !endDate) continue;
-
-    const description = decodeHTMLEntities(unescapeICS(fields.DESCRIPTION || ""));
-    const url = fields.URL || null;
-
-    let imageURL = null;
-    const imageField = fields["IMAGE;VALUE=URI"] || fields.IMAGE || null;
-    if (imageField) {
-      imageURL = imageField.replace(/^VALUE=URI:/, "");
-    }
-
-    const pokemonDexNrs = matchPokemon(title, tag, pokemonNames);
-    // Megas named in the title get a species id so the app renders the mega
-    // rather than the base species.
-    const megaForms = extractMegaForms(title, pokemonNames);
-    const pokemonSpeciesIds =
-      megaForms.size > 0
-        ? pokemonDexNrs.map((dex) =>
-            megaForms.has(dex) ? `${dex}_${megaForms.get(dex)}` : String(dex)
-          )
-        : null;
-
-    events.push({
-      id: fields.UID,
-      summary,
-      tag,
-      title,
-      description,
-      startDate,
-      endDate,
-      isAllDay,
-      url,
-      imageURL,
-      pokemonDexNrs,
-      ...(pokemonSpeciesIds ? { pokemonSpeciesIds } : {}),
-    });
-  }
-
-  events.sort((a, b) => a.startDate.localeCompare(b.startDate));
-  return events;
-}
-
 // ─── Leek Duck Enrichment ───────────────────────────────────
 
 async function enrichFromLeekDuck(events) {
@@ -422,67 +336,6 @@ export function extractPokemonFromHTML(html) {
 }
 
 // ─── Shared Helpers ─────────────────────────────────────────
-
-function extractFields(block) {
-  const fields = {};
-  const lines = block.split("\n");
-  let inAlarm = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed === "BEGIN:VALARM") { inAlarm = true; continue; }
-    if (trimmed === "END:VALARM") { inAlarm = false; continue; }
-    if (inAlarm) continue;
-
-    if (!trimmed || !trimmed.includes(":")) continue;
-    const colonIdx = trimmed.indexOf(":");
-    const key = trimmed.substring(0, colonIdx);
-    const value = trimmed.substring(colonIdx + 1);
-    fields[key] = value;
-  }
-
-  return fields;
-}
-
-export function parseTag(summary) {
-  const tagMatch = summary.match(/^\[([A-Z]+)\]\s*/);
-  if (!tagMatch) return { tag: "", title: summary };
-  const tag = tagMatch[1];
-  const title = summary.replace(/^\[.*?\]\s*/g, "").trim();
-  return { tag, title };
-}
-
-export function parseICSDate(raw) {
-  if (!raw) return { dateStr: null, isAllDay: false };
-  const clean = raw.trim();
-
-  if (clean.length === 8) {
-    const y = clean.substring(0, 4);
-    const m = clean.substring(4, 6);
-    const d = clean.substring(6, 8);
-    return { dateStr: `${y}-${m}-${d}`, isAllDay: true };
-  }
-
-  if (clean.length >= 15) {
-    const y = clean.substring(0, 4);
-    const m = clean.substring(4, 6);
-    const d = clean.substring(6, 8);
-    const h = clean.substring(9, 11);
-    const min = clean.substring(11, 13);
-    const s = clean.substring(13, 15);
-    return { dateStr: `${y}-${m}-${d}T${h}:${min}:${s}`, isAllDay: false };
-  }
-
-  return { dateStr: null, isAllDay: false };
-}
-
-export function unescapeICS(str) {
-  return str
-    .replace(/\\n/g, "\n")
-    .replace(/\\,/g, ",")
-    .replace(/\\;/g, ";")
-    .replace(/\\\\/g, "\\");
-}
 
 // Decode HTML entities that leak through from scraped sources (e.g. ScrapedDuck
 // titles like "PokémonXP &amp; 2026 Worlds"). Handles named and numeric

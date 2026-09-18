@@ -73,9 +73,11 @@ earlier must be folded in rather than left behind.
 `Pokémon XP &amp; 2026 Worlds` shipped to users.
 
 **6a. The event feed is never empty.** `events-not-empty` — blocking
-Every event source traces back to one root: ScrapedDuck. The ICS "fallback" is
-go-calendar, which consumes the same `events.min.json`, so it fails in lockstep
-rather than covering for it. An empty feed also empties the Battle screen, whose
+Every event source traces back to one root: ScrapedDuck. A go-calendar ICS feed
+was wired in as a fallback until it was removed on 2026-09-18 — it consumed the
+same `events.min.json`, so it failed in lockstep while reading like redundancy.
+The committed cache is the real protection. An empty feed also empties the
+Battle screen, whose
 formats are parsed from GBL event titles — the dex and PvP rankings survive, the
 events and formats do not. Stale data always beats none, so this blocks.
 
