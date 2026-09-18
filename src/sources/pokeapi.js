@@ -29,6 +29,7 @@ export async function fetchEvolutionChains() {
     // Fetch chains in batches
     const familyByDex = {};
     let fetched = 0;
+    let skipped = 0;
 
     for (let i = 0; i < chainIds.length; i += BATCH) {
       const batch = chainIds.slice(i, i + BATCH);
@@ -46,7 +47,7 @@ export async function fetchEvolutionChains() {
       );
 
       for (const chain of batchResults) {
-        if (!chain) continue;
+        if (!chain) { skipped++; continue; }
         const flat = flattenChain(chain);
         for (const dex of flat) {
           familyByDex[dex] = flat;
@@ -59,9 +60,29 @@ export async function fetchEvolutionChains() {
       }
     }
 
-    // Cache the result
+    // Never let a partial run overwrite a complete one. Each chain is fetched
+    // individually and a rate-limited or timed-out chain is skipped silently,
+    // so a degraded run looks exactly like a successful smaller one. Species
+    // only ever gain evolution data, so fewer entries than last time means the
+    // run was incomplete, not that Pokemon stopped evolving.
+    const count = Object.keys(familyByDex).length;
+    if (skipped > 0) {
+      console.warn(`  pokeapi-evolution-chains: ${skipped} chain(s) failed to fetch`);
+    }
+    const cachedCount = readCachedCount();
+    if (cachedCount !== null && count < cachedCount) {
+      console.warn(
+        `  pokeapi-evolution-chains: run returned ${count} species, cache has ${cachedCount} — ` +
+          `keeping cache (set ALLOW_EVOLUTION_SHRINK=1 to overwrite)`
+      );
+      if (!process.env.ALLOW_EVOLUTION_SHRINK) {
+        const data = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
+        return { familyByDex: toMap(data), status: "cached", error: `incomplete run (${count} < ${cachedCount})` };
+      }
+    }
+
     writeFileSync(CACHE_PATH, JSON.stringify(familyByDex));
-    console.log(`  pokeapi-evolution-chains: fresh (${Object.keys(familyByDex).length} species)`);
+    console.log(`  pokeapi-evolution-chains: fresh (${count} species)`);
     return { familyByDex: toMap(familyByDex), status: "fresh" };
   } catch (err) {
     console.warn(`  pokeapi-evolution-chains: fetch failed (${err.message}), using cache`);
@@ -71,6 +92,16 @@ export async function fetchEvolutionChains() {
     }
     console.warn("  pokeapi-evolution-chains: no cache available");
     return { familyByDex: new Map(), status: "error", error: err.message };
+  }
+}
+
+/** Species count in the cache, or null when there is no usable cache. */
+function readCachedCount() {
+  if (!existsSync(CACHE_PATH)) return null;
+  try {
+    return Object.keys(JSON.parse(readFileSync(CACHE_PATH, "utf-8"))).length;
+  } catch {
+    return null;
   }
 }
 
