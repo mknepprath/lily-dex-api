@@ -2,11 +2,13 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 
 const CACHE_DIR = new URL("../cache/", import.meta.url).pathname;
 
-export async function fetchWithCache(name, url) {
+export async function fetchWithCache(name, url, { timeout } = {}) {
   const cachePath = `${CACHE_DIR}${name}.json`;
   try {
     console.log(`  Fetching ${name}...`);
-    const res = await fetch(url);
+    // A hung request would otherwise stall the whole build; callers that
+    // pass a timeout fall through to their cache instead of waiting.
+    const res = await fetch(url, timeout ? { signal: AbortSignal.timeout(timeout) } : undefined);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     writeFileSync(cachePath, JSON.stringify(data));

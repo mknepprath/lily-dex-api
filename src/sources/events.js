@@ -9,6 +9,8 @@
  * can interpret them in the user's local timezone.
  */
 
+import { fetchWithCache } from "../utils.js";
+
 const SCRAPEDDUCK_URL =
   "https://raw.githubusercontent.com/bigfoott/ScrapedDuck/data/events.min.json";
 const CALENDAR_URL =
@@ -68,9 +70,16 @@ export async function fetchEvents(pokemonNames) {
 // ─── ScrapedDuck ────────────────────────────────────────────
 
 async function fetchScrapedDuck(pokemonNames) {
-  const res = await fetch(SCRAPEDDUCK_URL, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  // Cached like every other source. Events were the one source fetched raw,
+  // so a transient outage dropped us to the thinner ICS fallback — or, if that
+  // failed in the same build, published an empty event list to every user.
+  // Serving the last good copy is better than either.
+  const { data, status, error } = await fetchWithCache("events-scrapedduck", SCRAPEDDUCK_URL, {
+    timeout: 15000,
+  });
+  if (status === "cached") {
+    console.warn(`  ScrapedDuck: serving cached events (${error})`);
+  }
 
   if (!Array.isArray(data)) throw new Error("Invalid data format");
 
