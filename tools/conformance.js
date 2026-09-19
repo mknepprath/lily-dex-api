@@ -42,7 +42,7 @@ check(
 check(
   "mega-forms-complete",
   "advisory",
-  "mega stats and types were read from the wrong Game Master template, so every published mega had stats: null",
+  "megas shipped with stats: null (read from the wrong Game Master template), and a mega with no sprite of its own renders as its base species",
   (dex) => {
     const bad = [];
     for (const p of dex) {
@@ -51,9 +51,12 @@ check(
         if (!f.primaryType) bad.push(`${f.formId}: no primaryType`);
         else if (!f.stats || !f.stats.attack) bad.push(`${f.formId}: no stats`);
         else if (!f.names?.English) bad.push(`${f.formId}: no name`);
+        // Its own art, not the base species' — the app stopped resolving
+        // sprites at runtime, so a missing id here is a base sprite on screen.
+        else if (!(f.spriteId >= 10000)) bad.push(`${f.formId}: no sprite of its own (spriteId ${f.spriteId})`);
       }
     }
-    return bad.length ? fail(bad.slice(0, 5).join("; "), bad.length) : pass("all megas carry name, types and stats");
+    return bad.length ? fail(bad.slice(0, 5).join("; "), bad.length) : pass("all megas carry name, types, stats and their own sprite");
   }
 );
 

@@ -5,6 +5,7 @@ import { fetchPokemonGoApi } from "./sources/pokemon-go-api.js";
 import { fetchEvents } from "./sources/events.js";
 import { fetchEvolutionChains } from "./sources/pokeapi.js";
 import { mergePokemon } from "./merge.js";
+import { fetchFormIds, buildSpriteMap, annotateSpriteIds } from "./sources/sprite-ids.js";
 
 const OUTPUT_DIR = new URL("../output/", import.meta.url).pathname;
 
@@ -164,6 +165,11 @@ async function build() {
 
   // Write outputs
   console.log("\nWriting output files...");
+
+  // Resolve sprite ids here so the app never has to ask PokeAPI at runtime.
+  const formIdsResult = await fetchFormIds();
+  const sprites = annotateSpriteIds(pokemon, buildSpriteMap(formIdsResult.formIds));
+  console.log(`  sprite ids: ${sprites.resolved}/${sprites.forms} forms resolved to their own art`);
 
   writeFileSync(`${OUTPUT_DIR}pokedex.json`, JSON.stringify(pokemon));
   console.log(`  pokedex.json (${pokemon.length} entries)`);

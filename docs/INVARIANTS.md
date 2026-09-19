@@ -26,7 +26,7 @@ Two consequences worth stating plainly:
 `cache/` is refetchable and safe to delete. `data/` is ours: the hand-maintained
 files, plus reference data we keep rather than merely cache.
 
-`data/evolution-chains.json` and `data/types.json` live there because the facts
+`data/evolution-chains.json`, `data/types.json` and `data/pokeapi-form-ids.json` live there because the facts
 underneath them only change when a new generation ships. PokeAPI and the Pokémon
 GO API refresh them; they do not own them. Both are marked never-shrink, because
 a 200 response carrying fewer rows is a degraded source, not news — the evolution
@@ -58,7 +58,9 @@ forms, so every consumer's form lookup missed and fell back to the base species.
 Every mega rendered as its unevolved self across raids, events, PvP and the dex.
 
 **2. Every mega form is complete.** `mega-forms-complete` — advisory
-Name, both type slots resolved, non-zero stats. The stats and type overrides live
+Name, both type slots resolved, non-zero stats, and a `spriteId` of its own
+(10000+). Sprite ids are resolved at build time now; a mega without one renders
+as its base species, which is how this whole class of bug first showed up. The stats and type overrides live
 on `pokemonSettings.tempEvoOverrides`, not on `temporaryEvolutionSettings`, which
 carries only an id and an asset bundle number. Reading the wrong one produces
 forms that exist and describe nothing.
